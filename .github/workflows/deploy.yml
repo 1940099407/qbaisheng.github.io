@@ -6,11 +6,11 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-     - name: 设置Node.js
-  uses: actions/setup-node@v4
-  with:
-    node-version: '20'
-    cache: 'npm'
+      - name: 设置Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
       - run: npm install
       - run: npm run build
       - name: 部署到GitHub Pages
