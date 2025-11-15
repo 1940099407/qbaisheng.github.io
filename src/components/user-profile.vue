@@ -77,10 +77,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import ReminderSetting from './ReminderSetting.vue'
-import GoalSetting from './GoalSetting.vue'
-import Achievement from './Achievement.vue'
-import CheckinTypeManager from './CheckinTypeManager.vue'
+import ReminderSetting from './reminder-setting.vue'
+import GoalSetting from './goal-setting.vue'
+import Achievement from './achievement-badge.vue'
+import CheckinTypeManager from './checkin-type-manager.vue'
 
 // 用户名
 const username = ref('')

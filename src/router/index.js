@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Layout from '../components/Layout.vue'
-import Login from '../components/Login.vue'
-import Checkin from '../components/Checkin.vue'
-import Record from '../components/Record.vue'
-import Profile from '../components/Profile.vue'
-import Statistics from '../components/Statistics.vue'
+import Layout from '../components/main-layout.vue'
+import Login from '../components/user-login.vue'
+import Checkin from '../components/checkin-form.vue'
+import Record from '../components/checkin-record.vue'
+import Profile from '../components/user-profile.vue'
+import Statistics from '../components/checkin-statistics.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
