@@ -9,7 +9,7 @@ import Statistics from '../components/checkin-statistics.vue'
 const routes = [
   { path: '/', redirect: '/login' },
   { path: '/login', component: Login },
-  // 所有需要左侧导航的页面都嵌套在Layout中
+  // 所有需要左侧导航的页面都嵌套在main-layout中
   {
     path: '/',
     component: Layout,

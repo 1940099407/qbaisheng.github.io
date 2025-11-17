@@ -62,6 +62,13 @@
     <div class="achievement-section">
       <Achievement />
     </div>
+    <!-- 数据备份与导入功能 -->
+    <template>
+      <div class="profile-container">
+        我的数据
+        <DataBackup />
+      </div>
+    </template>
 
     <!-- 数据统计入口 -->
     <div class="section-title">数据统计</div>
@@ -81,6 +88,7 @@ import ReminderSetting from './reminder-setting.vue'
 import GoalSetting from './goal-setting.vue'
 import Achievement from './achievement-badge.vue'
 import CheckinTypeManager from './checkin-type-manager.vue'
+import DataBackup from './data-backup.vue'
 
 // 用户名
 const username = ref('')

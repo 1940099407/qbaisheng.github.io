@@ -33,6 +33,14 @@
         <v-chart :option="typeDistributionOption" autoresize />
       </div>
     </div>
+
+    <!-- 打卡时段分析区域 -->
+    <div class="chart-section">
+      <h3>打卡时段分析</h3>
+      <!-- 只保留一个标题 -->
+      <!-- 图表容器：设置固定高度，避免渲染异常 -->
+      <div id="timeDistributionChart" class="chart-container"></div>
+    </div>
   </div>
 </template>
 
@@ -47,6 +55,7 @@ const records = ref([])
 onMounted(() => {
   const savedRecords = localStorage.getItem('checkinRecords')
   records.value = savedRecords ? JSON.parse(savedRecords) : []
+  initTimeDistributionChart()
 })
 
 // 1. 统计概览数据
@@ -186,6 +195,44 @@ const typeDistributionOption = computed(() => {
     ],
   }
 })
+
+// 新增：打卡时段分析
+const initTimeDistributionChart = () => {
+  const records = JSON.parse(localStorage.getItem('checkinRecords') || '[]')
+  if (records.length === 0) return
+
+  // 统计每个小时段的打卡次数
+  const timeDistribution = Array(24).fill(0)
+  records.forEach((record) => {
+    const hour = new Date(record.time).getHours()
+    timeDistribution[hour]++
+  })
+
+  // 使用echarts创建图表
+  const chartDom = document.getElementById('timeDistributionChart')
+  const myChart = echarts.init(chartDom)
+  const option = {
+    title: { text: '打卡时段分析' },
+    xAxis: {
+      type: 'category',
+      data: Array.from({ length: 24 }, (_, i) => `${i}:00-${i + 1}:00`),
+      axisLabel: { rotate: 30 },
+    },
+    yAxis: { type: 'value', min: 0 },
+    series: [
+      {
+        data: timeDistribution,
+        type: 'bar',
+        itemStyle: { color: '#40a9ff' },
+        name: '打卡次数',
+      },
+    ],
+  }
+
+  myChart.setOption(option)
+  // 监听窗口 resize 以自适应
+  window.addEventListener('resize', () => myChart.resize())
+}
 </script>
 
 <style scoped>
@@ -247,5 +294,21 @@ const typeDistributionOption = computed(() => {
 .chart-container {
   width: 100%;
   height: 400px;
+}
+
+/* 为图表容器设置样式，确保有足够空间 */
+.chart-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* 关键：设置图表容器的固定高度，否则echarts可能无法正常渲染 */
+.chart-container {
+  width: 100%;
+  height: 400px; /* 足够的高度确保图表完整显示 */
+  margin-top: 15px;
 }
 </style>
