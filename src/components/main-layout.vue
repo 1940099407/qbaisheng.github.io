@@ -19,6 +19,18 @@
           <i class="icon">📊</i>
           <span class="nav-text" v-if="!isCollapsed">打卡记录</span>
         </router-link>
+        <router-link
+          to="/activities"
+          class="nav-item"
+          :class="{ active: $route.path === '/activities' }"
+        >
+          <i class="icon">📅</i>
+          <span class="nav-text" v-if="!isCollapsed">活动参加</span>
+        </router-link>
+        <router-link to="/social" class="nav-item" :class="{ active: $route.path === '/social' }">
+          <i class="icon">👥</i>
+          <span class="nav-text" v-if="!isCollapsed">社交分享</span>
+        </router-link>
         <router-link to="/profile" class="nav-item" :class="{ active: $route.path === '/profile' }">
           <i class="icon">👤</i>
           <span class="nav-text" v-if="!isCollapsed">个人资料</span>
