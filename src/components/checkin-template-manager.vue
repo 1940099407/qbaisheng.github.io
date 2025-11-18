@@ -80,8 +80,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
+import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 模板列表
@@ -108,15 +108,15 @@ const formatDate = (time) => {
 }
 
 // 新增模板
-const handleAdd = () => {
-  currentTemplate.value = {
-    id: Date.now().toString(),
-    name: '',
-    fields: [{ name: '', type: 'text' }],
-    createTime: new Date().toISOString(),
-  }
-  showAddTemplateDialog.value = true
-}
+// const handleAdd = () => {
+//   currentTemplate.value = {
+//     id: Date.now().toString(),
+//     name: '',
+//     fields: [{ name: '', type: 'text' }],
+//     createTime: new Date().toISOString(),
+//   }
+//   showAddTemplateDialog.value = true
+// }
 
 // 编辑模板
 const handleEdit = (template) => {

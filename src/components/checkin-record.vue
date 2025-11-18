@@ -51,7 +51,32 @@
           <!-- 打卡备注（如果有） -->
           <div class="record-note" v-if="record.note">
             <span class="note-label">备注：</span>
-            {{ record.note }}
+            <div class="note-content" v-html="formatRecordNote(record.note)"></div>
+          </div>
+
+          <!-- 记录中的媒体文件 -->
+          <div class="record-media" v-if="record.media && record.media.length > 0">
+            <div class="media-label">附件：</div>
+            <div class="media-files">
+              <div v-for="(file, index) in record.media" :key="index" class="media-item">
+                <template v-if="file.type.startsWith('image/')">
+                  <img
+                    :src="file.url"
+                    class="media-thumbnail"
+                    :alt="'图片 ' + (index + 1)"
+                    @click="openMediaViewer(record.media, index)"
+                  />
+                </template>
+                <template v-else-if="file.type.startsWith('video/')">
+                  <video
+                    :src="file.url"
+                    class="media-thumbnail"
+                    controls
+                    @click="openMediaViewer(record.media, index)"
+                  ></video>
+                </template>
+              </div>
+            </div>
           </div>
 
           <!-- 操作按钮 -->
@@ -93,19 +118,88 @@
           <label>打卡备注：</label>
           <textarea v-model="editRecord.note" class="modal-textarea" rows="4"></textarea>
         </div>
+
+        <!-- 编辑时显示媒体文件 -->
+        <div class="modal-form-item" v-if="editRecord.media && editRecord.media.length > 0">
+          <label>媒体文件：</label>
+          <div class="media-files">
+            <div v-for="(file, index) in editRecord.media" :key="index" class="media-item">
+              <template v-if="file.type.startsWith('image/')">
+                <img
+                  :src="file.url"
+                  class="media-thumbnail"
+                  :alt="'图片 ' + (index + 1)"
+                  @click="openMediaViewer(editRecord.media, index)"
+                />
+              </template>
+              <template v-else-if="file.type.startsWith('video/')">
+                <video
+                  :src="file.url"
+                  class="media-thumbnail"
+                  controls
+                  @click="openMediaViewer(editRecord.media, index)"
+                ></video>
+              </template>
+            </div>
+          </div>
+        </div>
+
         <div class="modal-btns">
           <button class="cancel-btn" @click="isEditModalShow = false">取消</button>
           <button class="confirm-btn" @click="confirmEdit">确认</button>
         </div>
       </div>
     </div>
+
+    <!-- 媒体查看器弹窗 -->
+    <el-dialog
+      title="查看媒体"
+      v-model="showMediaViewer"
+      width="90%"
+      :close-on-click-modal="true"
+      :fullscreen="isFullscreen"
+    >
+      <div class="media-viewer-container">
+        <!-- 图片查看器 -->
+        <div v-if="currentMedia.type.startsWith('image/')" class="image-viewer">
+          <img :src="currentMedia.url" class="full-image" :alt="currentMedia.name" />
+        </div>
+
+        <!-- 视频查看器 -->
+        <div v-else-if="currentMedia.type.startsWith('video/')" class="video-viewer">
+          <video :src="currentMedia.url" class="full-video" controls></video>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="viewer-controls">
+          <span class="media-info"> {{ currentMediaIndex + 1 }} / {{ mediaList.length }} </span>
+
+          <div class="nav-buttons">
+            <el-button @click="prevMedia" :disabled="currentMediaIndex === 0" size="small">
+              上一个
+            </el-button>
+            <el-button
+              @click="nextMedia"
+              :disabled="currentMediaIndex === mediaList.length - 1"
+              size="small"
+            >
+              下一个
+            </el-button>
+          </div>
+
+          <el-button @click="isFullscreen = !isFullscreen" size="small">
+            {{ isFullscreen ? '退出全屏' : '全屏查看' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-// 修正Element Plus导入：使用ElMessageBox替代ElConfirm
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElDialog, ElButton } from 'element-plus'
 
 // 状态管理
 const allRecords = ref([]) // 所有打卡记录
@@ -115,6 +209,13 @@ const currentPage = ref(1) // 当前页码
 const checkinTypes = ref(['学习', '健身', '阅读', '其他']) // 打卡类型
 const isEditModalShow = ref(false) // 编辑弹窗状态
 const editRecord = ref({}) // 当前编辑的记录
+
+// 媒体查看器相关状态
+const showMediaViewer = ref(false)
+const mediaList = ref([])
+const currentMediaIndex = ref(0)
+const currentMedia = ref(null)
+const isFullscreen = ref(false)
 
 // 加载数据
 onMounted(() => {
@@ -169,8 +270,49 @@ const getTypeClass = (type) => {
     健身: 'type-sport',
     阅读: 'type-read',
     其他: 'type-other',
+    工作: 'type-work',
+    冥想: 'type-meditation',
   }
   return colorMap[type] || 'type-custom'
+}
+
+// 格式化记录中的备注（支持话题和链接）
+const formatRecordNote = (text) => {
+  if (!text) return ''
+  let formatted = text
+  // 话题高亮（#xxx）
+  formatted = formatted.replace(/#([^#\s]+)/g, '<span class="topic">#$1</span>')
+  // 链接识别（http://xxx）
+  formatted = formatted.replace(
+    /https?:\/\/[^\s]+/g,
+    '<a href="$&" target="_blank" class="link">$&</a>',
+  )
+  return formatted
+}
+
+// 打开媒体查看器
+const openMediaViewer = (files, index) => {
+  mediaList.value = files
+  currentMediaIndex.value = index
+  currentMedia.value = files[index]
+  showMediaViewer.value = true
+  isFullscreen.value = false
+}
+
+// 查看上一个媒体
+const prevMedia = () => {
+  if (currentMediaIndex.value > 0) {
+    currentMediaIndex.value--
+    currentMedia.value = mediaList.value[currentMediaIndex.value]
+  }
+}
+
+// 查看下一个媒体
+const nextMedia = () => {
+  if (currentMediaIndex.value < mediaList.value.length - 1) {
+    currentMediaIndex.value++
+    currentMedia.value = mediaList.value[currentMediaIndex.value]
+  }
 }
 
 // 编辑打卡记录
@@ -195,7 +337,7 @@ const confirmEdit = () => {
   }
 }
 
-// 删除打卡记录（使用ElMessageBox.confirm）
+// 删除打卡记录
 const handleDelete = (recordId) => {
   ElMessageBox.confirm('确定要删除这条打卡记录吗？', '确认删除', {
     confirmButtonText: '确认',
@@ -209,7 +351,7 @@ const handleDelete = (recordId) => {
       ElMessage.success('记录已删除')
     })
     .catch(() => {
-      // 取消删除（可选）
+      // 取消删除
       ElMessage.info('已取消删除')
     })
 }
@@ -218,7 +360,9 @@ const handleDelete = (recordId) => {
 <style scoped>
 /* 页面容器 */
 .record-container {
-  padding: 0;
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .record-container h2 {
@@ -335,6 +479,12 @@ const handleDelete = (recordId) => {
 .type-other {
   background: #722ed1;
 }
+.type-work {
+  background: #096dd9;
+}
+.type-meditation {
+  background: #f5222d;
+}
 .type-custom {
   background: #8c8c8c;
 }
@@ -357,6 +507,57 @@ const handleDelete = (recordId) => {
 .note-label {
   color: #999;
   font-weight: 500;
+}
+
+.note-content {
+  margin-top: 5px;
+}
+
+.topic {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.link {
+  color: #722ed1;
+  text-decoration: underline;
+}
+
+/* 媒体文件样式 */
+.record-media {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #f0f0f0;
+}
+
+.media-label {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.media-files {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.media-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.media-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* 操作按钮 */
@@ -456,7 +657,8 @@ const handleDelete = (recordId) => {
   background: white;
   padding: 25px;
   border-radius: 10px;
-  width: 300px;
+  width: 500px;
+  max-width: 90%;
 }
 
 .modal-content h4 {
@@ -487,6 +689,7 @@ const handleDelete = (recordId) => {
 
 .modal-textarea {
   resize: vertical;
+  min-height: 100px;
 }
 
 .modal-btns {
@@ -512,6 +715,54 @@ const handleDelete = (recordId) => {
   border: none;
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* 媒体查看器样式 */
+.media-viewer-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.image-viewer {
+  width: 100%;
+  text-align: center;
+}
+
+.full-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.video-viewer {
+  width: 100%;
+  text-align: center;
+}
+
+.full-video {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 4px;
+}
+
+.viewer-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.media-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 10px;
 }
 
 /* 响应式调整 */

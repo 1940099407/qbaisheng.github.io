@@ -81,9 +81,42 @@
           <button class="tool-btn" @click="insertTopic" title="添加话题">
             <span>#</span> 话题
           </button>
-          <button class="tool-btn" @click="insertExample" title="添加示例文本">
-            <span>✏️</span> 示例
-          </button>
+          <label class="tool-btn file-upload-btn" title="添加照片/视频">
+            <span>📷</span> 媒体
+            <input
+              type="file"
+              accept="image/*,video/*"
+              class="file-input"
+              @change="handleFileUpload"
+              multiple
+            />
+          </label>
+        </div>
+
+        <!-- 媒体预览区域 -->
+        <div class="media-preview" v-if="mediaFiles.length > 0">
+          <div class="preview-label">媒体文件：</div>
+          <div class="media-files">
+            <div v-for="(file, index) in mediaFiles" :key="index" class="media-item">
+              <template v-if="file.type.startsWith('image/')">
+                <img
+                  :src="file.url"
+                  class="media-thumbnail"
+                  :alt="'图片 ' + (index + 1)"
+                  @click="openMediaViewer(mediaFiles, index)"
+                />
+              </template>
+              <template v-else-if="file.type.startsWith('video/')">
+                <video
+                  :src="file.url"
+                  class="media-thumbnail"
+                  controls
+                  @click="openMediaViewer(mediaFiles, index)"
+                ></video>
+              </template>
+              <button class="remove-media" @click="removeMedia(index)">×</button>
+            </div>
+          </div>
         </div>
 
         <!-- 格式化预览（仅当有内容时显示） -->
@@ -117,6 +150,31 @@
           </div>
           <div class="record-body" v-html="formatRecordNote(record.note)"></div>
 
+          <!-- 记录中的媒体文件 -->
+          <div class="record-media" v-if="record.media && record.media.length > 0">
+            <div class="media-label">附件：</div>
+            <div class="media-files">
+              <div v-for="(file, index) in record.media" :key="index" class="media-item">
+                <template v-if="file.type.startsWith('image/')">
+                  <img
+                    :src="file.url"
+                    class="media-thumbnail"
+                    :alt="'图片 ' + (index + 1)"
+                    @click="openMediaViewer(record.media, index)"
+                  />
+                </template>
+                <template v-else-if="file.type.startsWith('video/')">
+                  <video
+                    :src="file.url"
+                    class="media-thumbnail"
+                    controls
+                    @click="openMediaViewer(record.media, index)"
+                  ></video>
+                </template>
+              </div>
+            </div>
+          </div>
+
           <!-- 操作按钮（悬停显示） -->
           <div class="record-actions">
             <button class="action-btn edit-btn" @click="handleEditRecord(record)" title="编辑">
@@ -141,6 +199,50 @@
         </div>
       </div>
     </div>
+
+    <!-- 媒体查看器弹窗 -->
+    <el-dialog
+      title="查看媒体"
+      v-model="showMediaViewer"
+      width="90%"
+      :close-on-click-modal="true"
+      :fullscreen="isFullscreen"
+    >
+      <div class="media-viewer-container">
+        <!-- 图片查看器 -->
+        <div v-if="currentMedia.type.startsWith('image/')" class="image-viewer">
+          <img :src="currentMedia.url" class="full-image" :alt="currentMedia.name" />
+        </div>
+
+        <!-- 视频查看器 -->
+        <div v-else-if="currentMedia.type.startsWith('video/')" class="video-viewer">
+          <video :src="currentMedia.url" class="full-video" controls></video>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="viewer-controls">
+          <span class="media-info"> {{ currentMediaIndex + 1 }} / {{ mediaList.length }} </span>
+
+          <div class="nav-buttons">
+            <el-button @click="prevMedia" :disabled="currentMediaIndex === 0" size="small">
+              上一个
+            </el-button>
+            <el-button
+              @click="nextMedia"
+              :disabled="currentMediaIndex === mediaList.length - 1"
+              size="small"
+            >
+              下一个
+            </el-button>
+          </div>
+
+          <el-button @click="isFullscreen = !isFullscreen" size="small">
+            {{ isFullscreen ? '退出全屏' : '全屏查看' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -159,6 +261,14 @@ const formattedNote = ref('') // 备注格式化预览
 const showAddTypeDialog = ref(false) // 新增类型弹窗开关
 const newTypeName = ref('') // 新类型名称
 const editingRecordId = ref('') // 正在编辑的记录ID
+const mediaFiles = ref([]) // 存储上传的媒体文件
+
+// 媒体查看器相关状态
+const showMediaViewer = ref(false)
+const mediaList = ref([])
+const currentMediaIndex = ref(0)
+const currentMedia = ref(null)
+const isFullscreen = ref(false)
 
 // 格式化今日日期
 const todayDate = computed(() => {
@@ -281,7 +391,7 @@ const handleNoteInput = () => {
 
 // 插入话题示例
 const insertTopic = () => {
-  note.value += ' #今日目标'
+  note.value += ' #'
   handleNoteInput()
   // 聚焦到输入框
   nextTick(() => {
@@ -290,10 +400,69 @@ const insertTopic = () => {
   })
 }
 
-// 插入示例文本
-const insertExample = () => {
-  note.value += ' 完成了1小时学习，掌握了Vue组件通信技巧 #前端学习'
-  handleNoteInput()
+// 处理文件上传
+const handleFileUpload = (e) => {
+  const files = e.target.files
+  if (!files.length) return
+
+  Array.from(files).forEach((file) => {
+    // 检查文件类型
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      ElMessage.warning('请上传图片或视频文件')
+      return
+    }
+
+    // 检查文件大小 (5MB以内)
+    if (file.size > 5 * 1024 * 1024) {
+      ElMessage.warning('文件大小不能超过5MB')
+      return
+    }
+
+    // 读取文件并转换为DataURL
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      mediaFiles.value.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: event.target.result,
+      })
+    }
+    reader.readAsDataURL(file)
+  })
+
+  // 清空input值，允许重复选择同一文件
+  e.target.value = ''
+}
+
+// 移除媒体文件
+const removeMedia = (index) => {
+  mediaFiles.value.splice(index, 1)
+}
+
+// 打开媒体查看器
+const openMediaViewer = (files, index) => {
+  mediaList.value = files
+  currentMediaIndex.value = index
+  currentMedia.value = files[index]
+  showMediaViewer.value = true
+  isFullscreen.value = false
+}
+
+// 查看上一个媒体
+const prevMedia = () => {
+  if (currentMediaIndex.value > 0) {
+    currentMediaIndex.value--
+    currentMedia.value = mediaList.value[currentMediaIndex.value]
+  }
+}
+
+// 查看下一个媒体
+const nextMedia = () => {
+  if (currentMediaIndex.value < mediaList.value.length - 1) {
+    currentMediaIndex.value++
+    currentMedia.value = mediaList.value[currentMediaIndex.value]
+  }
 }
 
 // 快捷打卡
@@ -303,6 +472,7 @@ const handleQuickCheckin = (type) => {
     type,
     note: '快捷打卡',
     time: new Date().toISOString(),
+    media: [], // 快捷打卡默认无媒体
   }
 
   saveRecord(newRecord)
@@ -323,6 +493,8 @@ const handleSubmit = () => {
     newRecord.type = selectedType.value
     newRecord.note = note.value.trim() || '无备注'
     newRecord.time = new Date().toISOString() // 更新时间为当前
+    // 保留原有媒体或添加新媒体
+    newRecord.media = [...mediaFiles.value]
     ElMessage.success('记录已更新')
     editingRecordId.value = ''
   } else {
@@ -332,6 +504,7 @@ const handleSubmit = () => {
       type: selectedType.value,
       note: note.value.trim() || '无备注',
       time: new Date().toISOString(),
+      media: [...mediaFiles.value],
     }
     ElMessage.success('打卡成功！')
   }
@@ -340,6 +513,7 @@ const handleSubmit = () => {
   // 重置表单
   note.value = ''
   formattedNote.value = ''
+  mediaFiles.value = []
   selectedType.value = checkinTypes.value[0]
 }
 
@@ -367,6 +541,7 @@ const handleEditRecord = (record) => {
   editingRecordId.value = record.id
   selectedType.value = record.type
   note.value = record.note
+  mediaFiles.value = record.media ? [...record.media] : []
   handleNoteInput() // 触发预览
   // 滚动到表单
   scrollToForm()
@@ -431,9 +606,9 @@ const formatRecordNote = (text) => {
   return formatted
 }
 
-// 类型样式映射
+// 获取类型对应的样式类
 const getTypeClass = (type) => {
-  const map = {
+  const typeMap = {
     学习: 'type-study',
     健身: 'type-sport',
     阅读: 'type-read',
@@ -441,58 +616,177 @@ const getTypeClass = (type) => {
     工作: 'type-work',
     冥想: 'type-meditation',
   }
-  return map[type] || 'type-custom'
+  return typeMap[type] || 'type-custom'
 }
 </script>
 
-<style scoped>
-/* 核心容器 */
-.checkin-container {
+<style>
+/* 原有样式保持不变，添加以下新样式 */
+/* 媒体查看器样式 */
+.media-viewer-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.image-viewer {
   width: 100%;
+  text-align: center;
+}
+
+.full-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.video-viewer {
+  width: 100%;
+  text-align: center;
+}
+
+.full-video {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 4px;
+}
+
+.viewer-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.media-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* 其他原有样式... */
+.file-upload-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-input {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 100%;
+  min-height: 100%;
+  font-size: 100px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.media-preview {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5e9f2;
+}
+
+.record-media {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #f0f0f0;
+}
+
+.media-label {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.media-files {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.media-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.media-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-media {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.media-item:hover .remove-media {
+  opacity: 1;
+}
+
+/* 其他原有样式保持不变 */
+.checkin-container {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
 }
 
-/* 页面标题区 */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
 }
 
 .page-header h2 {
+  margin: 0;
   color: #1890ff;
   font-size: 24px;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .date-info {
   color: #666;
   font-size: 14px;
-  background: #f5f7fa;
-  padding: 4px 12px;
-  border-radius: 16px;
 }
 
-/* 连续打卡提示 */
 .streak-card {
+  background: linear-gradient(135deg, #fff7e6 0%, #fff0cc 100%);
+  border-radius: 12px;
+  padding: 15px 20px;
+  margin-bottom: 25px;
   display: flex;
   align-items: center;
   gap: 15px;
-  background: linear-gradient(135deg, #fff7e6 0%, #fff1cc 100%);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  border-left: 4px solid #faad14;
-  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.1);
 }
 
 .streak-icon {
@@ -502,7 +796,7 @@ const getTypeClass = (type) => {
 .streak-title {
   font-weight: 600;
   color: #fa8c16;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .streak-desc {
@@ -511,10 +805,8 @@ const getTypeClass = (type) => {
 }
 
 .streak-milestone {
-  color: #e67700;
-  font-weight: bold;
-  margin-left: 8px;
-  background: rgba(255, 255, 255, 0.6);
+  background: #faad14;
+  color: white;
   padding: 0 6px;
   border-radius: 4px;
   font-size: 12px;
@@ -700,22 +992,23 @@ const getTypeClass = (type) => {
   color: #1890ff;
 }
 
-/* 备注预览 */
+/* 预览样式 */
 .note-preview {
-  padding: 10px;
-  background: #f9f9f9;
-  border-radius: 6px;
-  margin-top: 5px;
+  margin-top: 10px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .preview-label {
-  font-size: 12px;
-  color: #999;
+  color: #666;
+  font-size: 13px;
   margin-bottom: 5px;
+  display: block;
 }
 
 .formatted-content {
-  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -725,78 +1018,66 @@ const getTypeClass = (type) => {
 }
 
 .link {
-  color: #1890ff;
+  color: #722ed1;
   text-decoration: underline;
 }
 
 /* 提交按钮 */
 .submit-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   width: 100%;
   padding: 12px 0;
   background: #1890ff;
-  color: #fff;
+  color: white;
   border: none;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
 }
 
 .submit-btn:hover {
   background: #096dd9;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
-}
-
-.submit-btn:active {
-  transform: translateY(0);
 }
 
 /* 今日记录区域 */
 .today-records-section {
-  margin-top: 10px;
+  margin-top: 30px;
 }
 
 .section-title {
+  font-size: 18px;
+  color: #333;
+  margin: 0 0 15px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 18px;
 }
 
 .title-icon {
   font-size: 20px;
-  color: #1890ff;
 }
 
 .record-count {
   font-size: 14px;
-  color: #999;
+  color: #666;
   font-weight: normal;
 }
 
 .records-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 15px;
+  margin-top: 15px;
 }
 
-/* 记录项样式 */
 .record-item {
-  padding: 16px;
   position: relative;
-  transition: all 0.2s;
-}
-
-.record-item:hover {
-  transform: translateX(4px);
+  overflow: hidden;
 }
 
 .record-header {
@@ -808,13 +1089,12 @@ const getTypeClass = (type) => {
 
 .record-type {
   padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  color: #fff;
+  border-radius: 4px;
+  font-size: 14px;
   font-weight: 500;
+  color: white;
 }
 
-/* 类型标签颜色 */
 .type-study {
   background: #1890ff;
 }
@@ -838,24 +1118,23 @@ const getTypeClass = (type) => {
 }
 
 .record-time {
-  color: #999;
+  color: #666;
   font-size: 13px;
 }
 
 .record-body {
-  color: #555;
-  font-size: 14px;
+  color: #333;
   line-height: 1.6;
-  padding-top: 10px;
-  border-top: 1px dashed #f0f0f0;
+  padding-bottom: 5px;
 }
 
 /* 记录操作按钮 */
 .record-actions {
+  position: absolute;
+  top: 15px;
+  right: 15px;
   display: flex;
   gap: 8px;
-  margin-top: 10px;
-  justify-content: flex-end;
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -865,45 +1144,45 @@ const getTypeClass = (type) => {
 }
 
 .action-btn {
-  padding: 2px 8px;
-  font-size: 12px;
+  padding: 3px 8px;
   border-radius: 4px;
+  font-size: 12px;
   cursor: pointer;
   border: none;
   transition: all 0.2s;
 }
 
 .edit-btn {
-  background: #f0f7ff;
+  background: #e6f7ff;
   color: #1890ff;
 }
 
 .edit-btn:hover {
-  background: #e6f4ff;
+  background: #bae7ff;
 }
 
 .delete-btn {
   background: #fff1f0;
-  color: #f5222d;
+  color: #ff4d4f;
 }
 
 .delete-btn:hover {
-  background: #fff1f0;
+  background: #ffe3e0;
 }
 
 /* 空状态样式 */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  background: #fff;
-  border-radius: 12px;
   color: #999;
+  background: #fafafa;
+  border-radius: 12px;
 }
 
 .empty-icon {
   font-size: 48px;
   margin-bottom: 15px;
-  color: #eee;
+  color: #ddd;
 }
 
 .empty-text {
@@ -924,36 +1203,5 @@ const getTypeClass = (type) => {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-}
-
-.empty-action-btn:hover {
-  background: #096dd9;
-}
-
-/* 响应式适配 */
-@media (max-width: 768px) {
-  .checkin-container {
-    padding: 10px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .streak-card {
-    flex-direction: column;
-    text-align: center;
-    padding: 16px;
-  }
-
-  .quick-type-btn {
-    min-width: 100px;
-  }
-
-  .record-actions {
-    opacity: 1; /* 移动端始终显示操作按钮 */
-  }
 }
 </style>
