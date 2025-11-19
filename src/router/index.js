@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Layout from '../components/main-layout.vue'
+import Layout from '../components/user-layout.vue'
 import AdminLayout from '../components/admin-layout.vue'
 import Login from '../components/user-login.vue'
 // 用户组件
@@ -8,6 +8,8 @@ import Record from '../components/checkin-record.vue'
 import Profile from '../components/user-profile.vue'
 import Statistics from '../components/checkin-statistics.vue'
 import ReminderSetting from '../components/reminder-setting.vue'
+import ActivitiesView from '../components/ActivitiesView.vue' // 新增导入
+import SocialAnalysisView from '../components/SocialAnalysisView.vue'
 // 管理员组件
 import UserManagement from '../components/admin/user-management.vue'
 import CheckinReview from '../components/admin/checkin-review.vue'
@@ -35,6 +37,8 @@ const routes = [
       { path: 'profile', component: Profile },
       { path: 'statistics', component: Statistics },
       { path: 'reminder', component: ReminderSetting }, // 新增提醒设置路由
+      { path: 'activities', component: ActivitiesView }, // 活动参加页面
+      { path: 'social', component: SocialAnalysisView }, // 社交分享页面
     ],
   },
 
