@@ -31,7 +31,8 @@ const isLocalStorageAvailable = () => {
     localStorage.setItem(testKey, testKey)
     localStorage.removeItem(testKey)
     return true
-  } catch (e) {
+    // eslint-disable-next-line no-unused-vars
+  } catch (_) {
     return false
   }
 }
