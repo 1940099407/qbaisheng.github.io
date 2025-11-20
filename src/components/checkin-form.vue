@@ -65,6 +65,54 @@
         </select>
       </div>
 
+      <!-- 新增：打卡方式选择 -->
+      <div class="form-item method-selector">
+        <label class="form-label">打卡方式</label>
+        <el-radio-group v-model="checkinMethod">
+          <el-radio label="normal">普通文字</el-radio>
+          <el-radio label="photo">拍照打卡</el-radio>
+          <el-radio label="location">定位打卡</el-radio>
+        </el-radio-group>
+      </div>
+
+      <!-- 定位打卡专属：显示定位信息 -->
+      <div v-if="checkinMethod === 'location'" class="location-info form-item">
+        <label class="form-label">当前定位</label>
+        <div class="location-content">
+          <p v-if="locationLoading">正在获取定位...</p>
+          <p v-if="locationError" class="error-text">{{ locationError }}</p>
+          <p v-if="locationInfo">
+            {{ locationInfo.address }} (误差: {{ locationInfo.accuracy }}米)
+          </p>
+          <el-button size="small" @click="getLocation">重新获取定位</el-button>
+        </div>
+      </div>
+
+      <!-- 拍照打卡专属：带水印的照片上传 -->
+      <div v-if="checkinMethod === 'photo'" class="form-item photo-item">
+        <!-- 仅让“拍摄照片（自动添加水印）”这段文字作为触发入口 -->
+        <!-- 单独的样式类，控制触发范围 -->
+        <label class="photo-trigger-label" for="camera-input"> 拍摄照片（自动添加水印） </label>
+        <input
+          id="camera-input"
+          type="file"
+          accept="image/*"
+          capture="camera"
+          @change="handlePhotoUpload"
+          class="file-input"
+        />
+        <div v-if="photoPreview" class="photo-preview">
+          <img :src="photoPreview" alt="打卡照片" class="preview-img" />
+          <p class="watermark-hint">照片已添加时间+定位水印</p>
+        </div>
+      </div>
+
+      <!-- 新增：定位状态提示 -->
+      <p class="location-status" v-if="locationInfo">
+        当前定位：{{ locationInfo.address }}（精度：{{ locationInfo.accuracy }}米）
+      </p>
+      <p class="location-status error" v-if="locationError">定位失败：{{ locationError }}</p>
+
       <!-- 增强版备注区域 -->
       <div class="form-item">
         <label class="form-label">打卡备注</label>
@@ -130,6 +178,12 @@
         <span class="btn-text">完成打卡</span>
         <span class="btn-icon">✅</span>
       </button>
+
+      <!-- 新增：防作弊提示 -->
+      <div class="anti-cheat-hint">
+        <el-icon><InfoFilled /></el-icon>
+        <span>系统将自动校验打卡时间、位置真实性，作弊将取消打卡资格</span>
+      </div>
     </div>
 
     <!-- 今日打卡记录 -->
@@ -145,6 +199,12 @@
           <div class="record-header">
             <div class="record-type" :class="getTypeClass(record.type)">
               {{ record.type }}
+            </div>
+            <!-- 新增：显示打卡方式，调用getMethodText和getMethodTagType -->
+            <div class="record-method">
+              <el-tag :type="getMethodTagType(record.method)">
+                {{ getMethodText(record.method) }}
+              </el-tag>
             </div>
             <div class="record-time">{{ formatTime(record.time) }}</div>
           </div>
@@ -249,6 +309,8 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElDialog, ElInput, ElButton } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue' // 导入提示图标
+import { watch } from 'vue' // 引入 watch
 
 // 状态管理
 const commonTypes = ref([]) // 常用打卡类型
@@ -269,6 +331,13 @@ const mediaList = ref([])
 const currentMediaIndex = ref(0)
 const currentMedia = ref(null)
 const isFullscreen = ref(false)
+
+// ====================== 新增：打卡方式相关状态 ======================
+const checkinMethod = ref('normal') // 打卡方式：normal(普通)/photo(拍照)/location(定位)
+const locationInfo = ref(null) // 定位信息：{ address, accuracy, latitude, longitude }
+const locationLoading = ref(false) // 定位加载状态
+const locationError = ref('') // 定位错误信息
+const photoPreview = ref('') // 拍照预览（带水印）
 
 // 格式化今日日期
 const todayDate = computed(() => {
@@ -465,6 +534,137 @@ const nextMedia = () => {
   }
 }
 
+// ====================== 新增：核心功能函数 ======================
+// 1. 获取定位（调用浏览器Geolocation API）
+const getLocation = () => {
+  if (!navigator.geolocation) {
+    locationError.value = '浏览器不支持定位，请更换浏览器'
+    return
+  }
+
+  locationLoading.value = true
+  locationError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // 模拟地址解析（实际项目可对接高德/百度地图API）
+      locationInfo.value = {
+        latitude: position.coords.latitude.toFixed(6),
+        longitude: position.coords.longitude.toFixed(6),
+        accuracy: Math.round(position.coords.accuracy),
+        address: `纬度：${position.coords.latitude.toFixed(6)}，经度：${position.coords.longitude.toFixed(6)}`,
+      }
+      locationLoading.value = false
+    },
+    (error) => {
+      const errorMsg = {
+        1: '用户拒绝定位权限',
+        2: '定位信息获取失败',
+        3: '定位超时',
+      }
+      locationError.value = `定位失败：${errorMsg[error.code] || error.message}`
+      locationLoading.value = false
+    },
+    { timeout: 10000, maximumAge: 0 }, // 10秒超时，不缓存定位
+  )
+}
+
+// 2. 拍照上传并添加水印
+const handlePhotoUpload = (e) => {
+  const file = e.target.files[0]
+  if (!file || !file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    const img = new Image()
+    img.src = event.target.result
+    img.onload = () => {
+      // 创建Canvas添加水印
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      canvas.width = img.width
+      canvas.height = img.height
+
+      // 绘制原图
+      ctx.drawImage(img, 0, 0)
+
+      // 添加水印：时间 + 定位
+      const now = new Date()
+      const timeStr = now.toLocaleString()
+      const locationStr = locationInfo.value
+        ? `定位：${locationInfo.value.latitude}, ${locationInfo.value.longitude}`
+        : '定位：未获取'
+      const watermarkText = `${timeStr} | ${locationStr}`
+
+      // 水印样式
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.font = '18px Arial'
+      ctx.textAlign = 'center'
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+      ctx.shadowBlur = 2
+
+      // 绘制水印（底部居中）
+      ctx.fillText(watermarkText, canvas.width / 2, canvas.height - 30)
+
+      // 转换为图片URL
+      const watermarkedUrl = canvas.toDataURL('image/jpeg', 0.9)
+      photoPreview.value = watermarkedUrl
+
+      // 自动添加到媒体文件
+      mediaFiles.value.push({
+        name: `打卡照片_${now.getTime()}.jpg`,
+        type: 'image/jpeg',
+        size: file.size,
+        url: watermarkedUrl,
+      })
+    }
+  }
+  reader.readAsDataURL(file)
+
+  // 清空input值，允许重复选择
+  e.target.value = ''
+}
+
+// 3. 防作弊校验逻辑
+const validateCheckin = () => {
+  // 3.1 时间戳校验（模拟与服务器时间对比，误差≤5分钟）
+  const serverTime = new Date().getTime() // 实际项目从后端获取
+  const checkinTime = new Date().getTime()
+  const timeDiff = Math.abs(checkinTime - serverTime)
+  if (timeDiff > 5 * 60 * 1000) {
+    ElMessage.error('打卡时间异常，请检查设备时间是否准确')
+    return false
+  }
+
+  // 3.2 定位打卡校验
+  if (checkinMethod.value === 'location') {
+    if (!locationInfo.value) {
+      ElMessage.error('请先获取定位信息')
+      return false
+    }
+    if (locationInfo.value.accuracy > 100) {
+      ElMessage.error('定位精度不足（需≤100米），请移动到信号更好的地方重试')
+      return false
+    }
+  }
+
+  // 3.3 拍照打卡校验
+  if (checkinMethod.value === 'photo' && !photoPreview.value) {
+    ElMessage.error('请拍摄并上传带水印的照片')
+    return false
+  }
+
+  // 3.4 普通打卡备注校验
+  if (checkinMethod.value === 'normal' && !note.value.trim()) {
+    ElMessage.warning('普通打卡请填写备注信息')
+    return false
+  }
+
+  return true
+}
+
 // 快捷打卡
 const handleQuickCheckin = (type) => {
   const newRecord = {
@@ -473,8 +673,14 @@ const handleQuickCheckin = (type) => {
     note: '快捷打卡',
     time: new Date().toISOString(),
     media: [], // 快捷打卡默认无媒体
+    method: 'normal', // 快捷打卡默认普通方式
+    verifyData: {
+      // 新增防作弊数据
+      timestamp: new Date().getTime(),
+      location: null,
+      photoWithWatermark: null,
+    },
   }
-
   saveRecord(newRecord)
   ElMessage.success(`✅ 已完成【${type}】快捷打卡`)
 }
@@ -486,6 +692,9 @@ const handleSubmit = () => {
     return
   }
 
+  // 先执行防作弊校验
+  if (!validateCheckin()) return
+
   let newRecord
   if (editingRecordId.value) {
     // 编辑模式：更新现有记录
@@ -493,7 +702,14 @@ const handleSubmit = () => {
     newRecord.type = selectedType.value
     newRecord.note = note.value.trim() || '无备注'
     newRecord.time = new Date().toISOString() // 更新时间为当前
-    // 保留原有媒体或添加新媒体
+    newRecord.method = checkinMethod.value // 新增：打卡方式
+    newRecord.verifyData = {
+      // 新增：防作弊数据
+      timestamp: new Date().getTime(),
+      location: checkinMethod.value === 'location' ? locationInfo.value : null,
+      photoWithWatermark: checkinMethod.value === 'photo' ? photoPreview.value : null,
+      // 保留原有媒体或添加新媒体
+    }
     newRecord.media = [...mediaFiles.value]
     ElMessage.success('记录已更新')
     editingRecordId.value = ''
@@ -505,6 +721,13 @@ const handleSubmit = () => {
       note: note.value.trim() || '无备注',
       time: new Date().toISOString(),
       media: [...mediaFiles.value],
+      method: checkinMethod.value, // 新增：打卡方式
+      verifyData: {
+        // 新增：防作弊数据
+        timestamp: new Date().getTime(),
+        location: checkinMethod.value === 'location' ? locationInfo.value : null,
+        photoWithWatermark: checkinMethod.value === 'photo' ? photoPreview.value : null,
+      },
     }
     ElMessage.success('打卡成功！')
   }
@@ -514,7 +737,11 @@ const handleSubmit = () => {
   note.value = ''
   formattedNote.value = ''
   mediaFiles.value = []
+  photoPreview.value = ''
+  locationInfo.value = null
+  locationError.value = ''
   selectedType.value = checkinTypes.value[0]
+  checkinMethod.value = 'normal'
 }
 
 // 保存记录到本地存储
@@ -542,9 +769,27 @@ const handleEditRecord = (record) => {
   selectedType.value = record.type
   note.value = record.note
   mediaFiles.value = record.media ? [...record.media] : []
-  handleNoteInput() // 触发预览
-  // 滚动到表单
+  // 回显打卡方式（如果有）
+  checkinMethod.value = record.method || 'normal'
+  // 回显拍照预览（如果有）
+  photoPreview.value = record.verifyData?.photoWithWatermark || ''
+  // 回显定位信息（如果有）
+  locationInfo.value = record.verifyData?.location || null
+  handleNoteInput()
   scrollToForm()
+}
+
+// ====================== 新增：辅助函数（记录展示用） ======================
+// 获取打卡方式文本
+const getMethodText = (method) => {
+  const map = { normal: '普通文字', photo: '拍照打卡', location: '定位打卡' }
+  return map[method] || '未知方式'
+}
+
+// 获取打卡方式标签类型（element-plus的tag类型）
+const getMethodTagType = (method) => {
+  const map = { normal: 'default', photo: 'info', location: 'success' }
+  return map[method] || 'default'
 }
 
 // 删除记录
@@ -618,10 +863,36 @@ const getTypeClass = (type) => {
   }
   return typeMap[type] || 'type-custom'
 }
+
+// 监听打卡方式变化，重置对应状态
+watch(checkinMethod, (newMethod, oldMethod) => {
+  // 1. 切换出「拍照打卡」时，重置拍照相关状态
+  if (oldMethod === 'photo') {
+    photoPreview.value = '' // 清空拍照预览
+    // 可选：移除媒体文件中通过拍照添加的图片（避免残留）
+    mediaFiles.value = mediaFiles.value.filter(
+      (file) => !file.url.startsWith('data:image/jpeg;base64'), // 过滤拍照生成的 base64 图片
+    )
+  }
+
+  // 2. 切换出「定位打卡」时，重置定位相关状态
+  if (oldMethod === 'location') {
+    locationInfo.value = null // 清空定位信息
+    locationError.value = '' // 清空定位错误提示
+    locationLoading.value = false // 确保定位加载状态关闭
+  }
+
+  // 新增：切换到拍照/定位方式时，自动获取定位
+  if (newMethod === 'photo' || newMethod === 'location') {
+    getLocation() // 自动调用定位函数
+  }
+  // 3. 切换到任何方式时，可选重置备注（根据需求决定）
+  // note.value = '';
+  // formattedNote.value = '';
+})
 </script>
 
 <style>
-/* 原有样式保持不变，添加以下新样式 */
 /* 媒体查看器样式 */
 .media-viewer-container {
   display: flex;
@@ -670,21 +941,63 @@ const getTypeClass = (type) => {
   gap: 10px;
 }
 
-/* 其他原有样式... */
-.file-upload-btn {
-  position: relative;
-  overflow: hidden;
+/* 统一按钮基础样式（话题 + 媒体） */
+.tool-btn {
+  padding: 4px 12px;
+  background: #f5f7fa;
+  border: 1px solid #e5e9f2;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  position: relative; /* 为媒体按钮的隐藏input做定位准备 */
 }
 
-.file-input {
-  position: absolute;
-  top: 0;
-  right: 0;
-  min-width: 100%;
-  min-height: 100%;
-  font-size: 100px;
-  opacity: 0;
-  cursor: pointer;
+/* 统一按钮hover效果 */
+.tool-btn:hover {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+/* 媒体按钮专属：强制样式继承 + hover效果（与话题按钮完全一致） */
+.tool-btn.file-upload-btn {
+  padding: 4px 12px !important;
+  background: #f5f7fa !important;
+  border: 1px solid #e5e9f2 !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+  color: #666 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  transition: all 0.2s !important;
+  position: relative !important;
+  z-index: 1 !important; /* 确保按钮在最上层，hover能被检测到 */
+}
+
+.tool-btn.file-upload-btn:hover {
+  background: #e6f7ff !important;
+  border-color: #91d5ff !important;
+  color: #1890ff !important;
+}
+
+/* 媒体按钮内隐藏input：确保点击优先，不干扰hover */
+.tool-btn.file-upload-btn .file-input {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  z-index: 2 !important; /* 点击优先于按钮本身，但不影响hover */
+  pointer-events: auto !important; /* 确保input能接收点击，按钮能接收hover */
 }
 
 .media-preview {
@@ -752,7 +1065,7 @@ const getTypeClass = (type) => {
   opacity: 1;
 }
 
-/* 其他原有样式保持不变 */
+/* 整体容器样式 */
 .checkin-container {
   max-width: 800px;
   margin: 0 auto;
@@ -972,26 +1285,6 @@ const getTypeClass = (type) => {
   margin: 10px 0;
 }
 
-.tool-btn {
-  padding: 4px 12px;
-  background: #f5f7fa;
-  border: 1px solid #e5e9f2;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #666;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
-}
-
-.tool-btn:hover {
-  background: #e6f7ff;
-  border-color: #91d5ff;
-  color: #1890ff;
-}
-
 /* 预览样式 */
 .note-preview {
   margin-top: 10px;
@@ -1085,6 +1378,7 @@ const getTypeClass = (type) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  gap: 10px;
 }
 
 .record-type {
@@ -1126,6 +1420,21 @@ const getTypeClass = (type) => {
   color: #333;
   line-height: 1.6;
   padding-bottom: 5px;
+}
+
+/* 记录中的定位信息样式 */
+.record-location {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+}
+
+.location-tag {
+  color: #1890ff;
+  font-weight: 500;
 }
 
 /* 记录操作按钮 */
@@ -1203,5 +1512,140 @@ const getTypeClass = (type) => {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+}
+
+/* 打卡方式radio组样式 */
+.method-radio-group {
+  display: flex;
+  gap: 20px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+/* 定位打卡区域样式 */
+.location-info .location-content {
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.location-info .loading-text {
+  color: #666;
+  font-size: 14px;
+}
+
+.location-info .error-text {
+  color: #ff4d4f;
+  font-size: 14px;
+}
+
+.location-info .location-detail {
+  color: #333;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.location-info .refresh-location {
+  margin-top: 10px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+/* 拍照打卡区域样式 */
+.photo-item {
+  position: relative;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+/* 拍摄文字触发样式（强制小手+统一颜色） */
+.photo-item .photo-trigger-label {
+  display: inline-block !important;
+  color: #1890ff !important;
+  text-decoration: underline !important;
+  cursor: pointer !important;
+  padding: 3px 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.photo-item .photo-trigger-label:hover {
+  color: #096dd9 !important;
+}
+
+.photo-item .photo-preview {
+  margin-top: 12px;
+}
+
+.photo-item .preview-img {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.photo-item .watermark-hint {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* 拍照预览时的定位状态提示 */
+.location-status {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+}
+
+.location-status.error {
+  color: #ff4d4f;
+}
+
+/* 防作弊提示样式优化 */
+.anti-cheat-hint {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f0f9fb;
+  border-left: 4px solid #409eff;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #666;
+}
+
+.anti-cheat-hint el-icon {
+  margin-right: 8px;
+  color: #409eff;
+}
+
+/* 记录头部打卡方式标签样式 */
+.record-method {
+  flex-shrink: 0;
+}
+
+.record-method .el-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+/* 打卡方式选择区域层级优化 */
+.form-item.method-selector {
+  position: relative;
+  z-index: 5;
+  padding-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+/* 隐藏文件输入框（通用） */
+.file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  cursor: pointer;
+  overflow: hidden;
 }
 </style>
