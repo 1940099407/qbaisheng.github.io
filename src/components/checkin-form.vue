@@ -167,11 +167,11 @@
           </div>
         </div>
 
-        <!-- 格式化预览（仅当有内容时显示） -->
+        <!-- 格式化预览（仅当有内容时显示）
         <div class="note-preview" v-if="formattedNote">
           <div class="preview-label">预览：</div>
           <div class="formatted-content" v-html="formattedNote"></div>
-        </div>
+        </div> -->
       </div>
 
       <button class="submit-btn" @click="handleSubmit">
@@ -237,7 +237,7 @@
 
           <!-- 操作按钮（悬停显示） -->
           <div class="record-actions">
-            <button class="action-btn edit-btn" @click="handleEditRecord(record)" title="编辑">
+            <button class="action-btn edit-btn" @click="handleOpenEditDialog(record)" title="编辑">
               编辑
             </button>
             <button
@@ -257,6 +257,104 @@
           <div class="empty-desc">点击上方快捷按钮或表单开始今日打卡吧~</div>
           <el-button class="empty-action-btn" @click="scrollToForm"> 立即打卡 </el-button>
         </div>
+
+        <!-- 新增：编辑弹窗 -->
+        <el-dialog
+          title="编辑打卡记录"
+          v-model="editDialogVisible"
+          width="600px"
+          :close-on-click-modal="false"
+        >
+          <el-form :model="editForm" label-width="80px" class="edit-form">
+            <!-- 打卡类型选择 -->
+            <el-form-item label="打卡类型">
+              <select v-model="editForm.type" class="form-select">
+                <option v-for="type in checkinTypes" :key="type">{{ type }}</option>
+              </select>
+            </el-form-item>
+
+            <!-- 打卡方式选择 -->
+            <el-form-item label="打卡方式">
+              <el-radio-group v-model="editForm.method">
+                <el-radio label="normal">普通文字</el-radio>
+                <el-radio label="photo">拍照打卡</el-radio>
+                <el-radio label="location">定位打卡</el-radio>
+              </el-radio-group>
+            </el-form-item>
+
+            <!-- 定位信息（编辑时仅展示，不允许修改） -->
+            <div v-if="editForm.method === 'location'" class="location-info form-item">
+              <label class="form-label">定位信息</label>
+              <div class="location-content">
+                <p v-if="editForm.verifyData?.location">
+                  {{ editForm.verifyData.location.address }} (误差:
+                  {{ editForm.verifyData.location.accuracy }}米)
+                </p>
+                <p v-else class="error-text">无定位信息</p>
+              </div>
+            </div>
+
+            <!-- 拍照预览（编辑时仅展示，可重新上传） -->
+            <div v-if="editForm.method === 'photo'" class="form-item photo-item">
+              <label class="photo-trigger-label" for="edit-camera-input">
+                重新拍摄照片（自动添加水印）
+                <span v-if="editLocationLoading" class="loading-text">（正在获取定位...）</span>
+              </label>
+              <input
+                id="edit-camera-input"
+                type="file"
+                accept="image/*"
+                capture="camera"
+                @change="handleEditPhotoUpload"
+                class="file-input"
+              />
+              <!-- 定位错误提示 -->
+              <p v-if="editLocationError" class="location-status error">
+                {{ editLocationError }}
+              </p>
+              <div v-if="editForm.photoPreview" class="photo-preview">
+                <img :src="editForm.photoPreview" alt="打卡照片" class="preview-img" />
+                <p class="watermark-hint">照片已添加时间+定位水印</p>
+              </div>
+            </div>
+
+            <!-- 备注输入 -->
+            <el-form-item label="打卡备注">
+              <textarea
+                v-model="editForm.note"
+                class="form-textarea"
+                placeholder="记录今天的收获、时长或感受..."
+                rows="4"
+              ></textarea>
+
+              <!-- 媒体预览区域 -->
+              <div class="media-preview" v-if="editForm.media.length > 0">
+                <div class="preview-label">媒体文件：</div>
+                <div class="media-files">
+                  <div v-for="(file, index) in editForm.media" :key="index" class="media-item">
+                    <template v-if="file.type.startsWith('image/')">
+                      <img
+                        :src="file.url"
+                        class="media-thumbnail"
+                        :alt="'图片 ' + (index + 1)"
+                        @click="openMediaViewer(editForm.media, index)"
+                      />
+                    </template>
+                    <template v-else-if="file.type.startsWith('video/')">
+                      <video :src="file.url" class="media-thumbnail" controls></video>
+                    </template>
+                    <button class="remove-media" @click="removeEditMedia(index)">×</button>
+                  </div>
+                </div>
+              </div>
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <el-button @click="editDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleSaveEdit">保存修改</el-button>
+          </template>
+        </el-dialog>
       </div>
     </div>
 
@@ -339,11 +437,64 @@ const locationLoading = ref(false) // 定位加载状态
 const locationError = ref('') // 定位错误信息
 const photoPreview = ref('') // 拍照预览（带水印）
 
+// 新增：编辑弹窗相关状态
+const editDialogVisible = ref(false) // 编辑弹窗开关
+const editForm = ref({
+  id: '', // 记录ID
+  type: '', // 打卡类型
+  note: '', // 备注
+  method: 'normal', // 打卡方式
+  media: [], // 媒体文件
+  photoPreview: '', // 拍照预览
+  verifyData: {}, // 验证数据（含定位）
+})
+// 新增：编辑时的定位状态
+const editLocationInfo = ref(null) // 编辑时的最新定位
+const editLocationLoading = ref(false) // 编辑时定位加载中
+const editLocationError = ref('') // 编辑时定位错误
 // 格式化今日日期
 const todayDate = computed(() => {
   const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
   return new Date().toLocaleDateString('zh-CN', options)
 })
+
+// 编辑时获取定位（新增这个函数）
+const getEditLocation = () => {
+  if (!navigator.geolocation) {
+    editLocationError.value = '浏览器不支持定位，请更换浏览器'
+    return
+  }
+
+  editLocationLoading.value = true
+  editLocationError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // 模拟地址解析
+      editLocationInfo.value = {
+        latitude: position.coords.latitude.toFixed(6),
+        longitude: position.coords.longitude.toFixed(6),
+        accuracy: Math.round(position.coords.accuracy),
+        address: `纬度：${position.coords.latitude.toFixed(6)}，经度：${position.coords.longitude.toFixed(6)}`,
+      }
+      // 更新编辑表单的定位信息
+      editForm.value.verifyData = {
+        ...editForm.value.verifyData,
+        location: editLocationInfo.value,
+      }
+      editLocationLoading.value = false
+    },
+    (error) => {
+      const errorMsg = {
+        1: '用户拒绝定位权限',
+        2: '定位信息获取失败',
+        3: '定位超时',
+      }
+      editLocationError.value = `定位失败：${errorMsg[error.code] || error.message}`
+      editLocationLoading.value = false
+    },
+    { timeout: 10000, maximumAge: 0 },
+  )
+}
 
 // 初始化数据
 onMounted(() => {
@@ -351,6 +502,146 @@ onMounted(() => {
   loadAllRecords()
   calculateStreakCount() // 计算连续打卡天数
 })
+
+// 新增：打开编辑弹窗
+const handleOpenEditDialog = async (record) => {
+  // 复制记录数据到编辑表单
+  editForm.value = {
+    id: record.id,
+    type: record.type,
+    note: record.note,
+    method: record.method || 'normal',
+    media: record.media ? [...record.media] : [],
+    photoPreview: record.verifyData?.photoWithWatermark || '',
+    verifyData: { ...record.verifyData },
+  }
+  // 打开弹窗
+  editDialogVisible.value = true
+  // 自动获取一次最新定位（为后续重新拍摄做准备）
+  getEditLocation()
+}
+
+// 修改：编辑时处理照片上传（先获取定位，再处理照片）
+const handleEditPhotoUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file || !file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    const img = new Image()
+    img.src = event.target.result
+    img.onload = () => {
+      // 复用原有的水印逻辑
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.drawImage(img, 0, 0)
+
+      // 添加水印
+      const now = new Date()
+      const timeStr = now.toLocaleString()
+      const locationStr = editForm.value.verifyData?.location
+        ? `定位：${editForm.value.verifyData.location.latitude}, ${editForm.value.verifyData.location.longitude}`
+        : '定位：未获取'
+      const watermarkText = `${timeStr} | ${locationStr}`
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.font = '18px Arial'
+      ctx.textAlign = 'center'
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+      ctx.shadowBlur = 2
+      ctx.fillText(watermarkText, canvas.width / 2, canvas.height - 30)
+
+      // 更新编辑表单的预览和媒体
+      const watermarkedUrl = canvas.toDataURL('image/jpeg', 0.9)
+      editForm.value.photoPreview = watermarkedUrl
+
+      // 替换媒体文件中的第一张图片或添加新图片
+      if (editForm.value.media.length > 0 && editForm.value.media[0].type.startsWith('image/')) {
+        editForm.value.media[0] = {
+          name: `打卡照片_${now.getTime()}.jpg`,
+          type: 'image/jpeg',
+          size: file.size,
+          url: watermarkedUrl,
+        }
+      } else {
+        editForm.value.media.push({
+          name: `打卡照片_${now.getTime()}.jpg`,
+          type: 'image/jpeg',
+          size: file.size,
+          url: watermarkedUrl,
+        })
+      }
+    }
+  }
+  reader.readAsDataURL(file)
+  e.target.value = '' // 清空输入，允许重复选择
+}
+
+// 新增：移除编辑中的媒体文件
+const removeEditMedia = (index) => {
+  editForm.value.media.splice(index, 1)
+}
+
+// 新增：保存编辑内容
+const handleSaveEdit = () => {
+  // 新增：拍照打卡时校验定位是否有效
+  if (editForm.value.method === 'photo') {
+    if (!editForm.value.verifyData?.location) {
+      ElMessage.error('请先完成定位获取')
+      return
+    }
+    if (editForm.value.verifyData.location.accuracy > 100) {
+      ElMessage.error('定位精度不足（需≤100米），请移动到信号更好的地方重试')
+      return
+    }
+  }
+  // 简单验证
+  if (!editForm.value.type) {
+    ElMessage.warning('请选择打卡类型')
+    return
+  }
+  if (editForm.value.method === 'normal' && !editForm.value.note.trim()) {
+    ElMessage.warning('普通打卡请填写备注信息')
+    return
+  }
+  if (editForm.value.method === 'photo' && !editForm.value.photoPreview) {
+    ElMessage.warning('请上传打卡照片')
+    return
+  }
+
+  // 更新记录
+  const savedRecords = localStorage.getItem('checkinRecords') || '[]'
+  let allRecords = JSON.parse(savedRecords)
+  const recordIndex = allRecords.findIndex((r) => r.id === editForm.value.id)
+
+  if (recordIndex !== -1) {
+    // 保留原记录的创建时间，只更新修改内容
+    const originalRecord = allRecords[recordIndex]
+    allRecords[recordIndex] = {
+      ...originalRecord, // 保留原始字段
+      type: editForm.value.type,
+      note: editForm.value.note.trim() || '无备注',
+      method: editForm.value.method,
+      media: editForm.value.media,
+      verifyData: {
+        ...originalRecord.verifyData, // 保留原始验证数据
+        photoWithWatermark:
+          editForm.value.photoPreview || originalRecord.verifyData?.photoWithWatermark,
+      },
+      updateTime: new Date().toISOString(), // 新增更新时间
+    }
+
+    localStorage.setItem('checkinRecords', JSON.stringify(allRecords))
+    loadAllRecords() // 重新加载记录
+    editDialogVisible.value = false // 关闭弹窗
+    ElMessage.success('记录已更新')
+  }
+}
 
 // 1. 加载打卡类型（支持本地存储持久化）
 const loadCheckinTypes = () => {
@@ -763,21 +1054,21 @@ const saveRecord = (record) => {
   calculateStreakCount() // 重新计算连续天数
 }
 
-// 编辑记录
-const handleEditRecord = (record) => {
-  editingRecordId.value = record.id
-  selectedType.value = record.type
-  note.value = record.note
-  mediaFiles.value = record.media ? [...record.media] : []
-  // 回显打卡方式（如果有）
-  checkinMethod.value = record.method || 'normal'
-  // 回显拍照预览（如果有）
-  photoPreview.value = record.verifyData?.photoWithWatermark || ''
-  // 回显定位信息（如果有）
-  locationInfo.value = record.verifyData?.location || null
-  handleNoteInput()
-  scrollToForm()
-}
+// // 编辑记录
+// const handleEditRecord = (record) => {
+//   editingRecordId.value = record.id
+//   selectedType.value = record.type
+//   note.value = record.note
+//   mediaFiles.value = record.media ? [...record.media] : []
+//   // 回显打卡方式（如果有）
+//   checkinMethod.value = record.method || 'normal'
+//   // 回显拍照预览（如果有）
+//   photoPreview.value = record.verifyData?.photoWithWatermark || ''
+//   // 回显定位信息（如果有）
+//   locationInfo.value = record.verifyData?.location || null
+//   handleNoteInput()
+//   scrollToForm()
+// }
 
 // ====================== 新增：辅助函数（记录展示用） ======================
 // 获取打卡方式文本
@@ -1647,5 +1938,20 @@ watch(checkinMethod, (newMethod, oldMethod) => {
   opacity: 0;
   cursor: pointer;
   overflow: hidden;
+}
+
+/* 新增：编辑弹窗样式补充 */
+.edit-form .form-select {
+  width: 100%;
+}
+
+.edit-form .photo-item {
+  margin-top: 0;
+}
+/* 新增：编辑时的定位加载提示样式 */
+.loading-text {
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
 }
 </style>
