@@ -2,9 +2,7 @@
   <div class="activities-container">
     <div class="page-header">
       <h2>活动参加</h2>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon> 创建活动
-      </el-button>
+      <!-- 已移除创建活动按钮 -->
     </div>
 
     <!-- 活动筛选 -->
@@ -68,68 +66,11 @@
         </div>
       </el-card>
     </div>
-
-    <!-- 创建活动弹窗 -->
-    <el-dialog title="创建新活动" v-model="showCreateDialog" width="600px">
-      <el-form ref="activityForm" :model="newActivity" label-width="100px">
-        <el-form-item
-          label="活动名称"
-          prop="title"
-          :rules="[{ required: true, message: '请输入活动名称' }]"
-        >
-          <el-input v-model="newActivity.title"></el-input>
-        </el-form-item>
-        <el-form-item
-          label="开始时间"
-          prop="startTime"
-          :rules="[{ required: true, message: '请选择开始时间' }]"
-        >
-          <el-date-picker
-            v-model="newActivity.startTime"
-            type="datetime"
-            placeholder="选择开始时间"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item
-          label="结束时间"
-          prop="endTime"
-          :rules="[{ required: true, message: '请选择结束时间' }]"
-        >
-          <el-date-picker
-            v-model="newActivity.endTime"
-            type="datetime"
-            placeholder="选择结束时间"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item
-          label="活动地点"
-          prop="location"
-          :rules="[{ required: true, message: '请输入活动地点' }]"
-        >
-          <el-input v-model="newActivity.location"></el-input>
-        </el-form-item>
-        <el-form-item
-          label="最大参与人数"
-          prop="maxParticipants"
-          :rules="[{ required: true, message: '请输入最大参与人数' }]"
-        >
-          <el-input v-model="newActivity.maxParticipants" type="number" min="1"></el-input>
-        </el-form-item>
-        <el-form-item label="活动描述">
-          <el-input v-model="newActivity.description" type="textarea" rows="4"></el-input>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="createActivity">创建</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 // 活动数据
@@ -137,31 +78,20 @@ const activities = ref([])
 // 搜索和筛选条件
 const searchKeyword = ref('')
 const activityStatus = ref('all')
-// 弹窗状态
-const showCreateDialog = ref(false)
 // 当前用户
 const currentUser = ref(localStorage.getItem('username') || '用户')
 
-// 新活动表单数据
-const newActivity = ref({
-  title: '',
-  startTime: '',
-  endTime: '',
-  location: '',
-  maxParticipants: 20,
-  description: '',
-  organizer: currentUser.value,
-  participants: [],
-  status: 'ongoing',
-})
-
-// 从本地存储加载活动数据
+// 从本地存储加载活动数据（新增：强制使用新示例数据，清除旧数据）
 onMounted(() => {
+  // 第一步：清除本地存储的旧活动数据（仅执行一次，之后可注释）
+  localStorage.removeItem('activities')
+
+  // 第二步：加载新的示例数据
   const saved = localStorage.getItem('activities')
   if (saved) {
     activities.value = JSON.parse(saved)
   } else {
-    // 初始化示例数据
+    // 修正语法错误：maxParticipants: 100（正确写法）
     activities.value = [
       {
         id: '1',
@@ -172,7 +102,57 @@ onMounted(() => {
         maxParticipants: 30,
         organizer: '管理员',
         participants: ['管理员', '张三'],
-        description: '每周六早上8点集合，一起跑步锻炼，欢迎各位健身爱好者参加！',
+        description:
+          '每周六早上8点集合，一起跑步锻炼，5公里休闲跑，适合新手入门，欢迎各位健身爱好者参加！',
+        status: 'ongoing',
+      },
+      {
+        id: '2',
+        title: '月度阅读打卡挑战',
+        startTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+        location: '线上（微信群分享）',
+        maxParticipants: 50,
+        organizer: '读书会会长',
+        participants: ['读书会会长', '李四', '王五'],
+        description:
+          '每月共读1本书，每周日晚8点线上分享读后感，本月书籍《人类简史》，需提交至少4次读书笔记。',
+        status: 'ongoing',
+      },
+      {
+        id: '3',
+        title: '办公室瑜伽放松课',
+        startTime: new Date().toISOString(),
+        endTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        location: '公司1号会议室',
+        maxParticipants: 15,
+        organizer: '行政部',
+        participants: ['行政部', '赵六'],
+        description: '每天中午12:30-13:00，专业瑜伽老师指导，缓解久坐疲劳，需自备瑜伽垫。',
+        status: 'ongoing',
+      },
+      {
+        id: '4',
+        title: '社区公益环保行动',
+        startTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        location: '阳光社区广场',
+        maxParticipants: 20,
+        organizer: '社区居委会',
+        participants: ['社区居委会', '孙七', '周八'],
+        description: '清理社区公共区域垃圾，宣传垃圾分类知识，共建美好家园。',
+        status: 'ended',
+      },
+      {
+        id: '5',
+        title: '30天健身打卡计划',
+        startTime: new Date().toISOString(),
+        endTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        location: '全城连锁健身房',
+        maxParticipants: 100, // 已修正：去掉换行，语法正确
+        organizer: '健身教练小李',
+        participants: ['健身教练小李', '吴九'],
+        description: '每天完成30分钟健身训练，教练提供专业计划，打卡满25天可获赠健身包。',
         status: 'ongoing',
       },
     ]
@@ -183,17 +163,13 @@ onMounted(() => {
 // 过滤活动列表
 const filteredActivities = computed(() => {
   return activities.value.filter((activity) => {
-    // 搜索关键词过滤
     const matchesSearch =
       activity.title.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
       activity.description.toLowerCase().includes(searchKeyword.value.toLowerCase())
-
-    // 状态过滤
     const matchesStatus =
       activityStatus.value === 'all' ||
       (activityStatus.value === 'ongoing' && activity.status === 'ongoing') ||
       (activityStatus.value === 'ended' && activity.status === 'ended')
-
     return matchesSearch && matchesStatus
   })
 })
@@ -212,49 +188,13 @@ const isParticipant = (activity) => {
 const joinActivity = (activityId) => {
   const activity = activities.value.find((a) => a.id === activityId)
   if (!activity) return
-
   if (activity.participants.length >= activity.maxParticipants) {
     ElMessage.warning('活动人数已达上限，无法参加')
     return
   }
-
   activity.participants.push(currentUser.value)
   saveActivities()
   ElMessage.success('成功参加活动')
-}
-
-// 创建活动
-const createActivity = () => {
-  // 简单验证
-  if (!newActivity.value.title || !newActivity.value.startTime || !newActivity.value.endTime) {
-    ElMessage.warning('请完善活动信息')
-    return
-  }
-
-  // 添加新活动
-  activities.value.push({
-    ...newActivity.value,
-    id: Date.now().toString(),
-    status: 'ongoing',
-  })
-
-  // 保存数据
-  saveActivities()
-  // 重置表单
-  newActivity.value = {
-    title: '',
-    startTime: '',
-    endTime: '',
-    location: '',
-    maxParticipants: 20,
-    description: '',
-    organizer: currentUser.value,
-    participants: [],
-    status: 'ongoing',
-  }
-  // 关闭弹窗
-  showCreateDialog.value = false
-  ElMessage.success('活动创建成功')
 }
 
 // 保存活动数据到本地存储
