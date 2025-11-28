@@ -63,63 +63,79 @@
       <template v-slot:header>
         <h3 class="card-header-title">好友列表</h3>
       </template>
-      <el-table :data="friends" border class="friend-table">
-        <el-table-column prop="name" label="好友名称" width="150">
-          <template #default="scope">
-            <div class="friend-name">
-              <el-avatar :size="32" class="friend-avatar-sm">
-                {{ scope.row.name?.charAt(0) || '?' }}
-              </el-avatar>
-              <span>{{ scope.row.name }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="互动频率" width="150">
-          <template #default="scope">
-            <div class="frequency-indicator">
-              <div
-                class="frequency-bar"
-                :style="{
-                  width: scope.row.frequency + '%',
-                  backgroundColor: getFrequencyColor(scope.row.frequency),
-                }"
-              ></div>
-              <span class="frequency-text">{{ getFrequencyText(scope.row.frequency) }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="lastInteraction" label="最近互动" width="200">
-          <template #default="scope">
-            {{ formatDate(scope.row.lastInteraction) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="共同打卡" width="120">
-          <template #default="scope">
-            <span class="common-checkins">{{ scope.row.commonCheckins }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180">
-          <template #default="scope">
-            <el-button size="small" class="msg-btn" @click="sendMessage(scope.row.id)"
-              >发消息</el-button
-            >
-            <el-button
-              size="small"
-              type="text"
-              class="profile-btn"
-              @click="viewProfile(scope.row.id)"
-              >查看资料</el-button
-            >
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 表格容器：小屏幕横向滚动，大屏自适应 -->
+      <div class="table-container">
+        <el-table :data="friends" border class="friend-table" fit>
+          <el-table-column prop="name" label="好友名称" min-width="140">
+            <template #default="scope">
+              <div class="friend-name">
+                <el-avatar :size="32" class="friend-avatar-sm">
+                  {{ scope.row.name?.charAt(0) || '?' }}
+                </el-avatar>
+                <span>{{ scope.row.name }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- 恢复进度条样式的互动频率列 -->
+          <el-table-column label="互动频率" min-width="150">
+            <template #default="scope">
+              <div class="frequency-indicator">
+                <div
+                  class="frequency-bar"
+                  :style="{
+                    width: scope.row.frequency + '%',
+                    backgroundColor: getFrequencyColor(scope.row.frequency),
+                  }"
+                ></div>
+                <span class="frequency-text">{{ getFrequencyText(scope.row.frequency) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="lastInteraction" label="最近互动" min-width="120">
+            <template #default="scope">
+              {{ formatDate(scope.row.lastInteraction) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="共同打卡" min-width="100">
+            <template #default="scope">
+              <span class="common-checkins">{{ scope.row.commonCheckins }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" min-width="280">
+            <template #default="scope">
+              <div class="operation-buttons">
+                <el-button size="small" class="msg-btn" @click="sendMessage(scope.row.id)"
+                  >发消息</el-button
+                >
+                <el-button
+                  size="small"
+                  type="text"
+                  class="profile-btn"
+                  @click="viewProfile(scope.row.id)"
+                  >查看资料</el-button
+                >
+                <el-button
+                  size="small"
+                  type="text"
+                  class="delete-btn"
+                  @click="deleteFriend(scope.row.id)"
+                >
+                  删除好友
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- 聊天弹窗 -->
     <el-dialog
       v-model="showChatModal"
       :title="`与 ${currentChatFriend?.name || ''} 聊天`"
-      width="400px"
+      :width="isMobile ? '90%' : '400px'"
       class="chat-modal"
       :close-on-click-modal="false"
     >
@@ -153,7 +169,7 @@
     <el-dialog
       v-model="showProfileModal"
       :title="`${currentProfileFriend?.name || '好友'} 的资料`"
-      width="400px"
+      :width="isMobile ? '90%' : '400px'"
       class="profile-modal"
       :close-on-click-modal="false"
     >
@@ -211,7 +227,7 @@
     <el-dialog
       v-model="showAddFriendModal"
       title="添加好友"
-      width="400px"
+      :width="isMobile ? '90%' : '400px'"
       class="add-friend-modal"
       :close-on-click-modal="false"
     >
@@ -250,7 +266,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watchEffect } from 'vue'
 import {
   ElMessage,
   ElDialog,
@@ -262,10 +278,22 @@ import {
   ElFormItem,
   ElTable,
   ElTableColumn,
+  ElMessageBox,
 } from 'element-plus'
 import Chart from 'chart.js/auto'
 
-// 新增：当前用户名（从本地存储获取）
+// 判断是否为移动设备（用于响应式适配）
+const isMobile = ref(window.innerWidth < 768)
+// 监听窗口大小变化，实时更新设备类型
+watchEffect(() => {
+  const handleResize = () => {
+    isMobile.value = window.innerWidth < 768
+  }
+  window.addEventListener('resize', handleResize)
+  return () => window.removeEventListener('resize', handleResize)
+})
+
+// 当前用户名（从本地存储获取）
 const currentUser = ref(localStorage.getItem('username') || '我')
 
 // 好友统计数据
@@ -289,17 +317,17 @@ const commonActivityStats = ref({
 // 好友列表
 const friends = ref([])
 
-// --- 聊天功能相关状态 ---
+// 聊天功能相关状态
 const showChatModal = ref(false)
 const currentChatFriend = ref(null)
 const inputMessage = ref('')
 const chatMessages = ref([])
 
-// --- 查看资料功能相关状态 ---
+// 查看资料功能相关状态
 const showProfileModal = ref(false)
 const currentProfileFriend = ref(null)
 
-// --- 添加好友功能相关状态 ---
+// 添加好友功能相关状态
 const showAddFriendModal = ref(false)
 const addFriendFormRef = ref(null)
 const newFriendForm = reactive({
@@ -309,11 +337,11 @@ const newFriendForm = reactive({
 
 // 初始化数据
 onMounted(() => {
-  // 模拟加载数据
   loadFriendStats()
   loadInteractionStats()
   loadFriends()
   initChart()
+  isMobile.value = window.innerWidth < 768
 })
 
 // 从本地存储加载好友
@@ -328,7 +356,7 @@ const loadFriends = () => {
         id: '1',
         name: '张三',
         frequency: 85,
-        lastInteraction: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        lastInteraction: new Date('2025-11-18').toISOString(),
         commonCheckins: 12,
         joinDate: new Date('2023-01-15').toISOString(),
         tags: ['健身', '阅读', '编程'],
@@ -337,7 +365,7 @@ const loadFriends = () => {
         id: '2',
         name: '李四',
         frequency: 60,
-        lastInteraction: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        lastInteraction: new Date('2025-11-17').toISOString(),
         commonCheckins: 8,
         joinDate: new Date('2023-03-22').toISOString(),
         tags: ['电影', '美食', '旅行'],
@@ -346,19 +374,28 @@ const loadFriends = () => {
         id: '3',
         name: '王五',
         frequency: 30,
-        lastInteraction: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        lastInteraction: new Date('2025-11-19').toISOString(),
         commonCheckins: 3,
         joinDate: new Date('2023-06-10').toISOString(),
         tags: ['游戏', '音乐', '摄影'],
       },
       {
         id: '4',
-        name: '赵六',
-        frequency: 15,
-        lastInteraction: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        commonCheckins: 1,
+        name: '卢汉民',
+        frequency: 65,
+        lastInteraction: new Date('2025-11-26').toISOString(),
+        commonCheckins: 2,
         joinDate: new Date('2023-09-05').toISOString(),
-        tags: ['瑜伽', '冥想', '茶道'],
+        tags: ['运动', '历史'],
+      },
+      {
+        id: '5',
+        name: '林育生',
+        frequency: 40,
+        lastInteraction: new Date('2025-11-27').toISOString(),
+        commonCheckins: 4,
+        joinDate: new Date('2023-10-12').toISOString(),
+        tags: ['科技', '户外'],
       },
     ]
     saveFriendsToLocalStorage()
@@ -375,7 +412,6 @@ const saveFriendsToLocalStorage = () => {
 // 更新好友统计信息
 const updateFriendStats = () => {
   friendStats.value.total = friends.value.length
-  // 这里可以添加更复杂的统计逻辑，例如计算趋势等
 }
 
 // 加载好友统计
@@ -384,6 +420,26 @@ const loadFriendStats = () => {
     total: friends.value.length,
     trend: 2,
   }
+}
+
+// 删除好友
+const deleteFriend = (friendId) => {
+  const friend = friends.value.find((f) => f.id === friendId)
+  if (!friend) return
+
+  ElMessageBox.confirm(`确定要删除好友「${friend.name}」吗？`, '删除确认', {
+    confirmButtonText: '确认删除',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      friends.value = friends.value.filter((f) => f.id !== friendId)
+      saveFriendsToLocalStorage()
+      ElMessage.success(`已删除好友「${friend.name}」`)
+    })
+    .catch(() => {
+      ElMessage.info('已取消删除')
+    })
 }
 
 // 加载互动统计
@@ -480,14 +536,11 @@ const initChart = () => {
   })
 }
 
-// 格式化日期
+// 格式化日期（统一格式：年/月/日）
 const formatDate = (dateString) => {
   if (!dateString) return '暂无'
-  return new Date(dateString).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
+  const date = new Date(dateString)
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 }
 
 // 获取互动频率文本
@@ -498,7 +551,7 @@ const getFrequencyText = (value) => {
   return '较少'
 }
 
-// 新增：根据频率获取对应颜色
+// 根据频率获取对应颜色
 const getFrequencyColor = (value) => {
   if (value >= 80) return '#409eff' // 蓝色（频繁）
   if (value >= 50) return '#52c41a' // 绿色（较多）
@@ -506,7 +559,7 @@ const getFrequencyColor = (value) => {
   return '#f5222d' // 红色（较少）
 }
 
-// --- 发消息功能 ---
+// 发消息功能
 const sendMessage = (friendId) => {
   const friend = friends.value.find((f) => f.id === friendId)
   if (!friend) return
@@ -516,6 +569,7 @@ const sendMessage = (friendId) => {
   showChatModal.value = true
 }
 
+// 发送聊天消息
 const sendChatMessage = () => {
   if (!inputMessage.value.trim()) {
     ElMessage.warning('请输入消息内容')
@@ -528,13 +582,19 @@ const sendChatMessage = () => {
   })
 
   inputMessage.value = ''
-
+  // 更新互动频率
+  const friendIndex = friends.value.findIndex((f) => f.id === currentChatFriend.value.id)
+  if (friendIndex !== -1) {
+    friends.value[friendIndex].frequency = Math.min(friends.value[friendIndex].frequency + 5, 100)
+    saveFriendsToLocalStorage()
+  }
   // 滚动到最新消息
   setTimeout(() => {
     const messageList = document.querySelector('.chat-message-list')
     messageList.scrollTop = messageList.scrollHeight
   }, 0)
 
+  // 模拟好友回复
   setTimeout(() => {
     const replies = [
       '好的，我知道了！',
@@ -557,7 +617,7 @@ const sendChatMessage = () => {
   }, 1000)
 }
 
-// --- 查看资料功能 ---
+// 查看资料功能
 const viewProfile = (friendId) => {
   const friend = friends.value.find((f) => f.id === friendId)
   if (friend) {
@@ -566,36 +626,31 @@ const viewProfile = (friendId) => {
   }
 }
 
-// --- 添加好友功能 ---
+// 添加好友功能
 const handleAddFriend = async () => {
   await addFriendFormRef.value.validate((valid) => {
     if (valid) {
-      // 处理标签，分割成数组
+      // 处理标签
       const tagsArray = newFriendForm.tags
         .split(',')
         .map((tag) => tag.trim())
         .filter((tag) => tag)
 
-      // 创建新好友对象
+      // 创建新好友
       const newFriend = {
-        id: Date.now().toString(), // 使用时间戳作为唯一ID
+        id: Date.now().toString(),
         name: newFriendForm.name,
-        frequency: Math.floor(Math.random() * 40) + 10, // 随机初始频率
+        frequency: Math.floor(Math.random() * 40) + 10,
         lastInteraction: new Date().toISOString(),
-        commonCheckins: Math.floor(Math.random() * 5), // 随机初始共同打卡次数
+        commonCheckins: Math.floor(Math.random() * 5),
         joinDate: new Date().toISOString(),
         tags: tagsArray.length > 0 ? tagsArray : ['未设置'],
       }
 
-      // 添加到好友列表
       friends.value.push(newFriend)
-
-      // 保存到本地存储
       saveFriendsToLocalStorage()
 
       ElMessage.success('好友添加成功！')
-
-      // 关闭弹窗并重置表单
       showAddFriendModal.value = false
       newFriendForm.name = ''
       newFriendForm.tags = ''
@@ -608,7 +663,7 @@ const handleAddFriend = async () => {
 </script>
 
 <style scoped>
-/* 全局样式重置与基础设置 */
+/* 全局样式：确保容器填满父元素 */
 * {
   margin: 0;
   padding: 0;
@@ -620,14 +675,20 @@ const handleAddFriend = async () => {
   padding: 30px;
   background-color: #f8f9fa;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  margin: 0 auto;
 }
 
-/* 页面头部 */
+/* 页面头部：自适应布局 */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
 .page-header h2 {
@@ -637,6 +698,8 @@ const handleAddFriend = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .page-header h2::before {
@@ -646,7 +709,6 @@ const handleAddFriend = async () => {
 
 /* 添加好友按钮 */
 ::v-deep .add-friend-btn {
-  /* 基础样式：去重+统一 */
   background-color: #409eff !important;
   color: #fff !important;
   border-radius: 24px !important;
@@ -654,31 +716,16 @@ const handleAddFriend = async () => {
   font-weight: 500 !important;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2) !important;
   transition: all 0.2s ease !important;
-
-  /* 强制居中核心：覆盖组件默认布局 */
   display: inline-flex !important;
-  align-items: center !important; /* 垂直居中 */
-  justify-content: center !important; /* 水平居中 */
-  text-align: center !important; /* 兜底：文字水平居中 */
-
-  /* 关键：对称内边距+固定高度，避免偏移 */
-  padding: 0 30px !important; /* 左右对称，取消上下内边距干扰 */
-  height: 44px !important; /* 固定高度 */
-  line-height: 44px !important; /* 行高=高度，强制垂直居中 */
-
-  /* 清除组件默认干扰 */
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 30px !important;
+  height: 44px !important;
+  line-height: 44px !important;
   border: none !important;
-  margin: 0 !important;
-  min-width: 140px !important; /* 足够宽度，避免文字挤压 */
-  box-sizing: border-box !important;
-
-  /* 清除图标占位（如果没加图标，组件可能留空） */
-  .el-icon {
-    display: none !important;
-  }
+  min-width: 140px !important;
 }
 
-/* hover/active 效果保留，不影响居中 */
 ::v-deep .add-friend-btn:hover {
   background-color: #337ecc !important;
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3) !important;
@@ -690,12 +737,13 @@ const handleAddFriend = async () => {
   box-shadow: 0 2px 6px rgba(64, 158, 255, 0.2) !important;
 }
 
-/* 统计卡片区域 */
+/* 统计卡片：自适应网格布局 */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 24px;
   margin-bottom: 30px;
+  width: 100%;
 }
 
 .stat-card {
@@ -705,12 +753,14 @@ const handleAddFriend = async () => {
   border: none !important;
   overflow: hidden;
   background: linear-gradient(135deg, #f5fafe 0%, #eaf6fa 100%) !important;
+  width: 100%;
 }
 
 .stat-item {
   text-align: center;
   padding: 25px 15px;
   position: relative;
+  width: 100%;
 }
 
 .stat-icon {
@@ -763,13 +813,14 @@ const handleAddFriend = async () => {
   color: #f5222d;
 }
 
-/* 图表卡片 */
+/* 图表卡片：填满容器 */
 .chart-card {
   margin-bottom: 30px;
   border-radius: 12px !important;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05) !important;
   border: none !important;
   padding: 20px;
+  width: 100%;
 }
 
 .card-header-title {
@@ -797,17 +848,25 @@ const handleAddFriend = async () => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-/* 好友列表卡片 */
+/* 好友列表卡片：填满容器 */
 .friends-card {
   border-radius: 12px !important;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05) !important;
   border: none !important;
   padding: 20px;
+  width: 100%;
+}
+
+/* 表格容器：小屏幕横向滚动，大屏自适应 */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .friend-table {
-  border-radius: 8px !important;
-  overflow: hidden;
+  width: 100% !important;
+  min-width: 768px; /* 确保小屏幕下有滚动，大屏自动填满 */
 }
 
 .el-table__header th {
@@ -831,6 +890,7 @@ const handleAddFriend = async () => {
   border-bottom: 1px solid #f5f5f5 !important;
   font-size: 14px;
   color: #333;
+  padding: 12px 8px !important;
 }
 
 /* 好友名称单元格 */
@@ -846,7 +906,7 @@ const handleAddFriend = async () => {
   font-size: 16px !important;
 }
 
-/* 互动频率指示器 */
+/* 互动频率进度条样式 */
 .frequency-indicator {
   position: relative;
   height: 22px;
@@ -884,13 +944,24 @@ const handleAddFriend = async () => {
   font-weight: 500;
 }
 
-/* 操作按钮 */
+/* 操作按钮容器：自适应排列 */
+.operation-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* 操作按钮样式 */
 .msg-btn {
   background-color: #e8f4f8 !important;
   color: #409eff !important;
   border-color: #d1e9f1 !important;
   border-radius: 6px !important;
   padding: 4px 10px !important;
+  flex: 1;
+  min-width: 80px;
 }
 
 .msg-btn:hover {
@@ -900,6 +971,9 @@ const handleAddFriend = async () => {
 
 .profile-btn {
   color: #faad14 !important;
+  flex: 1;
+  min-width: 80px;
+  text-align: center !important;
 }
 
 .profile-btn:hover {
@@ -907,16 +981,30 @@ const handleAddFriend = async () => {
   text-decoration: underline !important;
 }
 
-/* 聊天弹窗 */
+.delete-btn {
+  color: #f5222d !important;
+  flex: 1;
+  min-width: 80px;
+  text-align: center !important;
+}
+
+.delete-btn:hover {
+  color: #c41d1d !important;
+  text-decoration: underline !important;
+}
+
+/* 聊天弹窗：自适应宽度 */
 .chat-modal {
   border-radius: 12px !important;
   overflow: hidden !important;
+  max-width: 95vw !important;
 }
 
 .el-dialog__header {
   background-color: #409eff;
   color: #fff !important;
   padding: 16px 20px !important;
+  width: 100%;
 }
 
 .el-dialog__title {
@@ -937,6 +1025,7 @@ const handleAddFriend = async () => {
   overflow-y: auto;
   padding: 20px;
   margin-bottom: 15px;
+  width: 100%;
 }
 
 .chat-message-item {
@@ -988,6 +1077,7 @@ const handleAddFriend = async () => {
 .chat-input-area {
   display: flex;
   gap: 10px;
+  width: 100%;
 }
 
 .chat-input {
@@ -995,26 +1085,30 @@ const handleAddFriend = async () => {
   border-radius: 20px !important;
   padding: 8px 16px !important;
   border-color: #e5e9f2 !important;
+  width: 100%;
 }
 
 .send-btn {
   border-radius: 20px !important;
   padding: 8px 20px !important;
   background-color: #409eff !important;
+  white-space: nowrap;
 }
 
 .send-btn:hover {
   background-color: #337ecc !important;
 }
 
-/* 资料弹窗 */
+/* 资料弹窗：自适应宽度 */
 .profile-modal {
   border-radius: 12px !important;
   overflow: hidden !important;
+  max-width: 95vw !important;
 }
 
 .profile-container {
   padding: 20px;
+  width: 100%;
 }
 
 .profile-header {
@@ -1024,6 +1118,7 @@ const handleAddFriend = async () => {
   margin-bottom: 25px;
   justify-content: center;
   flex-direction: column;
+  width: 100%;
 }
 
 .profile-avatar {
@@ -1034,6 +1129,7 @@ const handleAddFriend = async () => {
 
 .profile-header-info {
   text-align: center;
+  width: 100%;
 }
 
 .profile-header-info h3 {
@@ -1049,27 +1145,23 @@ const handleAddFriend = async () => {
   margin: 0;
 }
 
-.frequency-tag {
-  padding: 2px 8px;
-  border-radius: 10px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-}
-
 .profile-divider {
   margin: 15px 0 !important;
   background-color: #f0f0f0 !important;
+  width: 100%;
 }
 
 .profile-details {
   margin-top: 10px;
+  width: 100%;
 }
 
 .profile-detail-item {
   display: flex;
   margin-bottom: 16px;
   align-items: flex-start;
+  width: 100%;
+  flex-wrap: wrap;
 }
 
 .detail-label {
@@ -1077,6 +1169,7 @@ const handleAddFriend = async () => {
   color: #666;
   font-weight: 500;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .detail-value {
@@ -1103,19 +1196,22 @@ const handleAddFriend = async () => {
   font-weight: 500;
 }
 
-/* 添加好友弹窗 */
+/* 添加好友弹窗：自适应宽度 */
 .add-friend-modal {
   border-radius: 12px !important;
   overflow: hidden !important;
+  max-width: 95vw !important;
 }
 
 .add-friend-form {
   padding: 10px 0;
+  width: 100%;
 }
 
 .form-input {
   border-radius: 8px !important;
   border-color: #e5e9f2 !important;
+  width: 100%;
 }
 
 .el-form-item__label {
@@ -1127,11 +1223,15 @@ const handleAddFriend = async () => {
 .cancel-btn {
   border-radius: 8px !important;
   color: #666 !important;
+  flex: 1;
+  margin-right: 10px !important;
 }
 
 .confirm-btn {
   border-radius: 8px !important;
   background-color: #409eff !important;
+  flex: 1;
+  margin-left: 10px !important;
 }
 
 .confirm-btn:hover {
@@ -1158,7 +1258,27 @@ const handleAddFriend = async () => {
   background: #bbb;
 }
 
-/* 响应式调整 */
+/* 响应式调整：适配不同屏幕尺寸 */
+@media (max-width: 1200px) {
+  .social-analysis-container {
+    padding: 25px;
+  }
+
+  .stats-grid {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .page-header h2 {
+    font-size: 22px;
+  }
+
+  .chart-container {
+    height: 300px;
+  }
+}
+
 @media (max-width: 768px) {
   .social-analysis-container {
     padding: 20px 15px;
@@ -1166,10 +1286,101 @@ const handleAddFriend = async () => {
 
   .stats-grid {
     grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .page-header {
+    gap: 10px;
+  }
+
+  .page-header h2 {
+    font-size: 20px;
+  }
+
+  ::v-deep .add-friend-btn {
+    padding: 0 20px !important;
+    font-size: 14px !important;
+    height: 40px !important;
+    line-height: 40px !important;
+  }
+
+  .chart-container {
+    height: 250px;
+    padding: 10px;
+  }
+
+  .card-header-title {
+    font-size: 16px;
+  }
+
+  .el-table__header th,
+  .el-table__body td {
+    font-size: 13px;
+    padding: 10px 6px !important;
+  }
+
+  .operation-buttons {
+    gap: 5px;
+  }
+
+  .msg-btn,
+  .profile-btn,
+  .delete-btn {
+    padding: 3px 6px !important;
+    font-size: 11px !important;
+    min-width: 70px;
   }
 
   .chat-message-list {
     height: 300px;
+    padding: 15px;
+  }
+
+  .profile-detail-item {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-label {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .social-analysis-container {
+    padding: 15px 10px;
+  }
+
+  .stats-grid {
+    gap: 10px;
+  }
+
+  .stat-item {
+    padding: 20px 10px;
+  }
+
+  .stat-value {
+    font-size: 30px;
+  }
+
+  .chart-container {
+    height: 200px;
+  }
+
+  .chat-input-area {
+    flex-direction: column;
+  }
+
+  .send-btn {
+    width: 100%;
+  }
+
+  .el-dialog__header {
+    padding: 12px 16px !important;
+  }
+
+  .el-dialog__title {
+    font-size: 14px !important;
   }
 }
 </style>

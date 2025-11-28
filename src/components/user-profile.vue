@@ -1,369 +1,674 @@
 <template>
-  <div class="profile-container container">
-    <!-- 个人信息卡片 -->
-    <div class="profile-card">
-      <div class="avatar-box">
-        <div class="avatar">
-          <!-- 字母头像（取用户名首字母） -->
-          <span>{{ username.charAt(0).toUpperCase() }}</span>
-        </div>
-        <div class="user-info">
-          <h2>{{ username || '未设置用户名' }}</h2>
-          <p class="join-date">注册时间：{{ joinDate }}</p>
-        </div>
+  <div class="page-container">
+    <div class="user-settings">
+      <div class="container">
+        <!-- 编辑资料模块 -->
+        <section class="setting-module">
+          <div class="module-header">
+            <div class="header-icon"></div>
+            <h2>编辑资料</h2>
+          </div>
+          <div class="module-card">
+            <el-form :model="formData" label-width="90px" class="profile-form">
+              <!-- 头像上传 -->
+              <el-form-item label="头像" class="form-item">
+                <div class="avatar-wrap">
+                  <img :src="formData.avatar" alt="用户头像" class="avatar" />
+                  <!-- 1. 给input加id，label通过for关联，点击label会自动触发input点击 -->
+                  <label class="avatar-upload-btn" for="avatar-upload-input">
+                    <i class="upload-icon"></i>
+                    <input
+                      type="file"
+                      id="avatar-upload-input"
+                      accept="image/*"
+                      class="avatar-file"
+                      @change="handleAvatarUpload"
+                    />
+                  </label>
+                </div>
+              </el-form-item>
+
+              <!-- 昵称 -->
+              <el-form-item label="昵称" class="form-item">
+                <el-input
+                  v-model="formData.nickname"
+                  maxlength="36"
+                  placeholder="请输入昵称"
+                  class="custom-input"
+                />
+                <span class="char-count">{{ formData.nickname.length }}/36</span>
+              </el-form-item>
+
+              <!-- 个性签名 -->
+              <el-form-item label="个签" class="form-item">
+                <el-input
+                  v-model="formData.signature"
+                  maxlength="80"
+                  type="textarea"
+                  rows="2"
+                  placeholder="分享你的状态或爱好"
+                  class="custom-textarea"
+                />
+                <span class="char-count">{{ formData.signature.length }}/80</span>
+              </el-form-item>
+
+              <!-- 性别 -->
+              <el-form-item label="性别" class="form-item">
+                <el-radio-group v-model="formData.gender" class="gender-group">
+                  <el-radio label="male" class="gender-option">男</el-radio>
+                  <el-radio label="female" class="gender-option">女</el-radio>
+                  <el-radio label="secret" class="gender-option">保密</el-radio>
+                </el-radio-group>
+              </el-form-item>
+
+              <!-- 生日 -->
+              <el-form-item label="生日" class="form-item">
+                <el-date-picker
+                  v-model="formData.birthday"
+                  type="date"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  placeholder="选择生日"
+                  class="custom-picker"
+                />
+              </el-form-item>
+
+              <!-- 保存按钮 -->
+              <el-form-item class="form-submit">
+                <el-button type="primary" class="save-btn" @click="saveProfile">保存资料</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+        </section>
+
+        <!-- 打卡提醒设置（支持自定义时间） -->
+        <section class="setting-module">
+          <div class="module-header">
+            <div class="header-icon"></div>
+            <h2>打卡提醒设置</h2>
+          </div>
+          <div class="module-card reminder-card">
+            <div class="reminder-item">
+              <span class="reminder-label">是否开启每日提醒</span>
+              <el-switch
+                v-model="reminderData.enabled"
+                active-color="#42b983"
+                inactive-color="#e5e7eb"
+                class="custom-switch"
+                @change="handleReminderChange"
+              />
+            </div>
+
+            <!-- 自定义时间选择器（开启后显示） -->
+            <div class="reminder-time-item" v-if="reminderData.enabled">
+              <span class="reminder-label">提醒时间</span>
+              <el-time-picker
+                v-model="reminderData.time"
+                format="HH:mm"
+                value-format="HH:mm"
+                placeholder="选择提醒时间"
+                class="time-picker"
+                :picker-options="{
+                  start: '06:00',
+                  end: '22:00',
+                  step: '00:15',
+                }"
+              />
+            </div>
+
+            <p class="reminder-desc">
+              {{
+                reminderData.enabled
+                  ? `开启后将在每天 ${reminderData.time || '08:30'} 推送打卡提醒`
+                  : '开启后可自定义每日打卡提醒时间'
+              }}
+            </p>
+          </div>
+        </section>
+
+        <!-- 我的成就（6个成就，含新增2个） -->
+        <section class="setting-module">
+          <div class="module-header">
+            <div class="header-icon"></div>
+            <h2>我的成就</h2>
+          </div>
+          <div class="module-card">
+            <div class="achievements-grid">
+              <!-- 初露锋芒（已解锁） -->
+              <div class="achievement-card unlocked">
+                <div class="achievement-icon star-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">初露锋芒</h3>
+                  <p class="achievement-desc">完成首次打卡</p>
+                  <p class="achievement-status">已解锁 · 2025/11/18</p>
+                </div>
+              </div>
+
+              <!-- 坚持不懈（进度中） -->
+              <div class="achievement-card">
+                <div class="achievement-icon calendar-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">坚持不懈</h3>
+                  <p class="achievement-desc">连续打卡7天</p>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (2 / 7) * 100 + '%' }"></div>
+                  </div>
+                  <p class="progress-text">进度：2/7</p>
+                </div>
+              </div>
+
+              <!-- 打卡达人（进度中） -->
+              <div class="achievement-card">
+                <div class="achievement-icon trophy-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">打卡达人</h3>
+                  <p class="achievement-desc">累计打卡30次</p>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (17 / 30) * 100 + '%' }"></div>
+                  </div>
+                  <p class="progress-text">进度：17/30</p>
+                </div>
+              </div>
+
+              <!-- 全勤模范（未解锁） -->
+              <div class="achievement-card">
+                <div class="achievement-icon chart-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">全勤模范</h3>
+                  <p class="achievement-desc">完成1次周全勤</p>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: '0%' }"></div>
+                  </div>
+                  <p class="progress-text">进度：0/1</p>
+                </div>
+              </div>
+
+              <!-- 新增：百日打卡（进度中） -->
+              <div class="achievement-card">
+                <div class="achievement-icon hundred-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">百日打卡</h3>
+                  <p class="achievement-desc">累计打卡100次</p>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (17 / 100) * 100 + '%' }"></div>
+                  </div>
+                  <p class="progress-text">进度：17/100</p>
+                </div>
+              </div>
+
+              <!-- 新增：连续王者（进度中） -->
+              <div class="achievement-card">
+                <div class="achievement-icon streak-icon"></div>
+                <div class="achievement-info">
+                  <h3 class="achievement-name">连续王者</h3>
+                  <p class="achievement-desc">连续打卡30天</p>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (2 / 30) * 100 + '%' }"></div>
+                  </div>
+                  <p class="progress-text">进度：2/30</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <!-- 打卡统计摘要 -->
-      <div class="stats-summary">
-        <div class="stat-item">
-          <div class="stat-value">{{ totalCheckins }}</div>
-          <div class="stat-label">总打卡次数</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ consecutiveDays }}</div>
-          <div class="stat-label">连续打卡天数</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ goalCompletionRate }}%</div>
-          <div class="stat-label">目标达成率</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 基本信息修改 -->
-    <div class="section-title">基本信息</div>
-    <div class="profile-form">
-      <div class="form-item">
-        <label>用户名：</label>
-        <input type="text" v-model="username" placeholder="请输入用户名" />
-      </div>
-      <button @click="saveProfile" class="save-btn">保存修改</button>
-    </div>
-
-    <!-- 打卡目标设置 -->
-    <div class="section-title">打卡目标</div>
-    <div class="goal-section">
-      <GoalSetting />
-    </div>
-
-    <!-- 打卡类型管理 -->
-    <div class="section-title">打卡类型管理</div>
-    <div class="type-manager-section">
-      <CheckinTypeManager />
-    </div>
-
-    <!-- 提醒设置 -->
-    <div class="section-title">提醒设置</div>
-    <div class="reminder-section">
-      <ReminderSetting />
-    </div>
-    <!-- 成就徽章 -->
-    <div class="section-title">我的成就</div>
-    <div class="achievement-section">
-      <Achievement />
-    </div>
-    <!-- 数据备份与导入功能 -->
-    <template>
-      <div class="profile-container">
-        我的数据
-        <DataBackup />
-      </div>
-    </template>
-
-    <!-- 数据统计入口 -->
-    <div class="section-title">数据统计</div>
-    <div class="stats-entrance">
-      <p>查看打卡数据趋势和详细统计分析</p>
-      <router-link to="/statistics" class="stats-btn">
-        前往数据统计 <i class="arrow">→</i>
-      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import ReminderSetting from './reminder-setting.vue'
-import GoalSetting from './goal-setting.vue'
-import Achievement from './achievement-badge.vue'
-import CheckinTypeManager from './checkin-type-manager.vue'
-import DataBackup from './data-backup.vue'
+import { reactive } from 'vue'
+import {
+  ElMessage,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElRadioGroup,
+  ElRadio,
+  ElDatePicker,
+  ElButton,
+  ElSwitch,
+  ElTimePicker,
+} from 'element-plus'
 
-// 用户名
-const username = ref('')
-
-// 页面加载时初始化数据
-onMounted(() => {
-  // 加载已保存的用户名
-  const savedName = localStorage.getItem('username')
-  username.value = savedName || ''
-
-  // 首次访问时记录注册时间
-  if (!localStorage.getItem('joinDate')) {
-    localStorage.setItem('joinDate', new Date().toLocaleDateString())
-  }
+// 表单数据（全局统一头像数据源）
+const formData = reactive({
+  avatar: 'https://picsum.photos/200/200?random=6',
+  nickname: '秦百胜',
+  signature: '',
+  gender: 'female',
+  birthday: '2003-08-03',
 })
 
-// 注册时间
-const joinDate = computed(() => {
-  return localStorage.getItem('joinDate') || '未知'
+// 提醒设置（新增自定义时间）
+const reminderData = reactive({
+  enabled: false,
+  time: '08:30', // 默认提醒时间
 })
 
-// 总打卡次数
-const totalCheckins = computed(() => {
-  const records = JSON.parse(localStorage.getItem('checkinRecords') || '[]')
-  return records.length
-})
+// // 头像上传触发
+// const triggerAvatarUpload = () => {
+//   document.querySelector('.avatar-file').click()
+// }
 
-// 连续打卡天数计算
-const consecutiveDays = computed(() => {
-  const records = JSON.parse(localStorage.getItem('checkinRecords') || '[]')
-  if (records.length === 0) return 0
+// 头像上传处理（同步更新右上角头像）
+const handleAvatarUpload = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
 
-  // 提取所有打卡日期（去重，按天）
-  const dateSet = new Set()
-  records.forEach((item) => {
-    const date = new Date(item.time).toLocaleDateString()
-    dateSet.add(date)
-  })
-  const sortedDates = Array.from(dateSet).sort((a, b) => new Date(b) - new Date(a))
+  const isImage = file.type.startsWith('image/')
+  const isLt2M = file.size / 1024 / 1024 < 2
 
-  let count = 1
-  const today = new Date().toLocaleDateString()
-  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString()
-
-  // 检查今天是否打卡
-  const hasCheckedToday = dateSet.has(today)
-  // 检查昨天是否打卡
-  const hasCheckedYesterday = dateSet.has(yesterday)
-
-  if (hasCheckedToday) {
-    // 从昨天开始计算连续天数
-    let prevDate = new Date(yesterday)
-    for (const dateStr of sortedDates) {
-      const currentDate = new Date(dateStr)
-      if (currentDate.getTime() === prevDate.getTime()) {
-        count++
-        prevDate = new Date(prevDate.getTime() - 86400000) // 前一天
-      } else if (currentDate.getTime() < prevDate.getTime()) {
-        break
-      }
-    }
-    return count
-  } else if (hasCheckedYesterday) {
-    // 从昨天往前计算
-    let prevDate = new Date(yesterday)
-    for (const dateStr of sortedDates) {
-      const currentDate = new Date(dateStr)
-      if (currentDate.getTime() === prevDate.getTime()) {
-        count++
-        prevDate = new Date(prevDate.getTime() - 86400000)
-      } else if (currentDate.getTime() < prevDate.getTime()) {
-        break
-      }
-    }
-    return count - 1 // 减去昨天本身
-  } else {
-    return 0
-  }
-})
-
-// 目标达成率
-const goalCompletionRate = computed(() => {
-  const records = JSON.parse(localStorage.getItem('checkinRecords') || '[]')
-  if (records.length === 0) return 0
-
-  // 按天分组统计打卡次数
-  const dailyCounts = {}
-  records.forEach((item) => {
-    const date = new Date(item.time).toLocaleDateString()
-    dailyCounts[date] = (dailyCounts[date] || 0) + 1
-  })
-
-  // 假设默认每日目标为1次，计算达成率
-  const totalDays = Object.keys(dailyCounts).length
-  const completedDays = Object.values(dailyCounts).filter((count) => count >= 1).length
-  return Math.round((completedDays / totalDays) * 100)
-})
-
-// 保存用户名
-const saveProfile = () => {
-  if (!username.value.trim()) {
-    ElMessage.warning('用户名不能为空')
+  if (!isImage) {
+    ElMessage.error('请上传 JPG/PNG 格式图片')
     return
   }
-  localStorage.setItem('username', username.value)
-  ElMessage.success('用户名修改成功')
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB')
+    return
+  }
+
+  // 预览并同步头像
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    formData.avatar = ev.target.result
+    ElMessage.success('头像更新成功')
+  }
+  reader.readAsDataURL(file)
+}
+
+// 保存资料
+const saveProfile = () => {
+  ElMessage.success('资料保存成功')
+}
+
+// 提醒开关状态变化回调
+const handleReminderChange = (value) => {
+  if (value) {
+    ElMessage.info(`已开启每日${reminderData.time}提醒`)
+  } else {
+    ElMessage.info('已关闭每日打卡提醒')
+  }
 }
 </script>
 
 <style scoped>
-.profile-container {
-  padding: 30px 20px;
-  max-width: 800px;
-  margin: 0 auto;
+/* 顶部导航栏样式 */
+.top-nav {
+  height: 60px;
+  border-bottom: 1px solid #f0f2f5;
+  padding: 0 20px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  background-color: #fff;
 }
 
-/* 个人信息卡片 */
-.profile-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  padding: 25px;
-  margin-bottom: 30px;
-}
-
-.avatar-box {
+.user-info {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 8px;
+}
+
+.top-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #f0f2f5;
+}
+
+.username {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* 全局样式 */
+.page-container {
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+.user-settings {
+  padding: 32px 0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 模块通用样式 */
+.setting-module {
+  margin-bottom: 32px;
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.header-icon {
+  width: 4px;
+  height: 20px;
+  background-color: #1890ff;
+  border-radius: 2px;
+}
+
+.module-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.module-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+  border: 1px solid #f0f2f5;
+}
+
+/* 编辑资料模块 */
+.form-item {
+  margin-bottom: 24px;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #f0f2f5;
+  cursor: pointer;
 }
 
 .avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #1890ff;
-  color: white;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-upload-btn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.5));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
-  font-weight: bold;
+  color: #fff;
 }
 
-.user-info h2 {
-  margin: 0;
-  color: #333;
-  font-size: 22px;
+.upload-icon {
+  width: 18px;
+  height: 18px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E")
+    center no-repeat;
 }
 
-.join-date {
-  color: #999;
-  font-size: 14px;
-  margin: 5px 0 0;
+.avatar-file {
+  display: none;
 }
 
-/* 统计摘要 */
-.stats-summary {
-  display: flex;
-  justify-content: space-around;
-  padding-top: 20px;
-  border-top: 1px dashed #eee;
-}
-
-.stat-item {
-  text-align: center;
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #1890ff;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  color: #666;
-  font-size: 14px;
-}
-
-/* 板块标题 */
-.section-title {
-  font-size: 18px;
-  color: #333;
-  margin: 40px 0 15px;
-  padding-left: 5px;
-  border-left: 3px solid #1890ff;
-}
-
-/* 表单样式 */
-.profile-form {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.form-item {
-  margin-bottom: 20px;
-}
-
-.form-item label {
-  display: block;
-  margin-bottom: 8px;
-  color: #666;
-  font-size: 16px;
-}
-
-.form-item input {
+.custom-input,
+.custom-textarea,
+.custom-picker {
   width: 100%;
-  padding: 12px 15px;
-  border: 1px solid #ddd;
+  max-width: 420px;
   border-radius: 8px;
-  font-size: 16px;
+  border: 1px solid #e5e7eb;
+  transition: border-color 0.2s;
+}
+
+.custom-input:focus,
+.custom-textarea:focus,
+.custom-picker:focus-within {
+  border-color: #42b983;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.1);
+  outline: none;
+}
+
+.custom-textarea {
+  resize: none;
+  padding: 12px;
+}
+
+.char-count {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: 90px;
+}
+
+.gender-group {
+  display: flex;
+  gap: 24px;
+  padding-top: 4px;
+}
+
+.gender-option {
+  font-size: 14px;
+  color: #374151;
 }
 
 .save-btn {
-  padding: 10px 20px;
-  background: #1890ff;
-  color: white;
+  padding: 10px 24px;
   border-radius: 8px;
-  font-size: 16px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
+  font-size: 14px;
+  background-color: #1890ff;
+  border-color: #1890ff;
+  transition: background-color 0.2s;
 }
 
 .save-btn:hover {
-  background: #096dd9;
+  background-color: #1890ff;
+  border-color: #1890ff;
 }
 
-/* 目标和提醒设置板块 */
-.goal-section,
-.reminder-section {
-  background: white;
-  padding: 10px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  margin-bottom: 15px;
+/* 打卡提醒设置 */
+.reminder-card {
+  padding: 20px 24px;
 }
 
-/* 数据统计入口 */
-.stats-entrance {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
-.stats-entrance p {
-  color: #666;
-  margin-bottom: 15px;
-}
-
-.stats-btn {
-  display: inline-flex;
+.reminder-item,
+.reminder-time-item {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #1890ff;
-  color: white;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.reminder-label {
+  font-size: 14px;
+  color: #374151;
+  flex: 0 0 120px;
+}
+
+.time-picker {
+  width: 180px;
   border-radius: 8px;
-  text-decoration: none;
-  transition: all 0.2s;
 }
 
-.stats-btn:hover {
-  background: #096dd9;
+.custom-switch {
+  --el-switch-width: 44px;
+  --el-switch-height: 22px;
+  --el-switch-node-size: 18px;
+}
+
+.reminder-desc {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+  padding-left: 132px;
+}
+
+/* 我的成就模块 */
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.achievement-card {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #f0f2f5;
+  background-color: #ffffff;
+  display: flex;
+  gap: 12px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.achievement-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.arrow {
-  font-size: 16px;
+.achievement-card.unlocked {
+  border-color: #1890ff;
+  background-color: #f0fdf4;
+}
+
+.achievement-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 成就图标样式 */
+.star-icon {
+  background-color: #fde68a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%2392400e' stroke='%2392400e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.calendar-icon {
+  background-color: #bfdbfe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%231e40af' stroke='%231e40af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.trophy-icon {
+  background-color: #fed7aa;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%239a3412' stroke='%239a3412' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4.5a2.5 2.5 0 0 0 0 5H6'/%3E%3Cpath d='M18 9h1.5a2.5 2.5 0 0 1 0 5H18'/%3E%3Cpath d='M4 22h16'/%3E%3Cpath d='M10 14.66V17a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-2.34'/%3E%3Cpath d='M9 9v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.chart-icon {
+  background-color: #dbeafe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%231e40af' stroke='%231e40af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpolyline points='3.27 6.96 12 12.01 20.73 6.96'/%3E%3Cline x1='12' y1='22.08' x2='12' y2='12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* 新增成就图标样式 */
+.hundred-icon {
+  background-color: #c7d2fe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%234338ca' stroke='%234338ca' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3Cpolyline points='10 9 9 9 8 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.streak-icon {
+  background-color: #fda4af;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%239f1239' stroke='%239f1239' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.achievement-info {
+  flex: 1;
+}
+
+.achievement-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+}
+
+.achievement-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.achievement-status {
+  font-size: 12px;
+  color: #1890ff;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* 进度条 */
+.progress-bar {
+  height: 6px;
+  background-color: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #1890ff;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .achievements-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .char-count {
+    margin-left: 0;
+  }
+
+  .reminder-desc {
+    padding-left: 0;
+  }
+
+  .module-card {
+    padding: 20px;
+  }
+
+  .reminder-item,
+  .reminder-time-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .time-picker {
+    width: 100%;
+  }
 }
 </style>
