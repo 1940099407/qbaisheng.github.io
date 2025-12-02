@@ -10,6 +10,9 @@ import Statistics from '../components/checkin-statistics.vue'
 import ReminderSetting from '../components/reminder-setting.vue'
 import ActivitiesView from '../components/ActivitiesView.vue' // 新增导入
 import SocialAnalysisView from '../components/SocialAnalysisView.vue'
+
+import Register from '../components/user-register.vue'
+
 // 管理员组件
 import UserManagement from '../components/admin/user-management.vue'
 import CheckinReview from '../components/admin/checkin-review.vue'
@@ -41,7 +44,12 @@ const routes = [
       { path: 'social', component: SocialAnalysisView }, // 社交分享页面
     ],
   },
-
+  // 新增注册路由
+  {
+    path: '/register',
+    component: Register,
+    meta: { requiresAuth: false },
+  },
   // 管理员路由（需管理员角色）
   {
     path: '/admin',
@@ -88,8 +96,8 @@ router.beforeEach((to, from, next) => {
     }
   } else {
     // 不需要登录的页面（登录页）
-    if (isLogin) {
-      // 已登录用户访问登录页时跳转到对应角色首页
+    if (isLogin && to.path !== '/register') {
+      // 允许已登录用户访问注册页
       const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
       next(homePath)
     } else {
