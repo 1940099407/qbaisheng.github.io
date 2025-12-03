@@ -12,7 +12,7 @@ import ActivitiesView from '../components/ActivitiesView.vue' // 新增导入
 import SocialAnalysisView from '../components/SocialAnalysisView.vue'
 
 import Register from '../components/user-register.vue'
-
+import HealthAssessment from '../components/HealthAssessment.vue'
 // 管理员组件
 import UserManagement from '../components/admin/user-management.vue'
 import CheckinReview from '../components/admin/checkin-review.vue'
@@ -42,6 +42,11 @@ const routes = [
       { path: 'reminder', component: ReminderSetting }, // 新增提醒设置路由
       { path: 'activities', component: ActivitiesView }, // 活动参加页面
       { path: 'social', component: SocialAnalysisView }, // 社交分享页面
+      {
+        path: 'health-assessment',
+        component: HealthAssessment,
+        meta: { title: '健康测评与指导' },
+      },
     ],
   },
   // 新增注册路由

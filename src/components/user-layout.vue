@@ -31,6 +31,14 @@
           <i class="icon">👥</i>
           <span class="nav-text" v-if="!isCollapsed">社交分享</span>
         </router-link>
+        <router-link
+          to="/health-assessment"
+          class="nav-item"
+          :class="{ active: $route.path === '/health-assessment' }"
+        >
+          <i class="icon">🏥</i>
+          <span class="nav-text" v-if="!isCollapsed">健康测评</span>
+        </router-link>
         <router-link to="/profile" class="nav-item" :class="{ active: $route.path === '/profile' }">
           <i class="icon">👤</i>
           <span class="nav-text" v-if="!isCollapsed">个人资料</span>
