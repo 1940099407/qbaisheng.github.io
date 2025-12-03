@@ -47,6 +47,10 @@ const routes = [
         component: HealthAssessment,
         meta: { title: '健康测评与指导' },
       },
+      {
+        path: 'approval-application',
+        component: () => import('../components/ApprovalApplication.vue'),
+      },
     ],
   },
   // 新增注册路由
@@ -65,6 +69,10 @@ const routes = [
       { path: 'checkin-review', component: CheckinReview },
       { path: 'activity-publish', component: ActivityPublish },
       { path: 'template-manager', component: TemplateManager }, // 模板管理路由
+      {
+        path: 'approval-management',
+        component: () => import('../components/admin/ApprovalManagement.vue'),
+      },
     ],
   },
 

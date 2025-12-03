@@ -28,6 +28,14 @@
           <span class="nav-text" v-if="!isCollapsed">打卡审核</span>
         </router-link>
         <router-link
+          to="/admin/approval-management"
+          class="nav-item"
+          :class="{ active: $route.path === '/admin/approval-management' }"
+        >
+          <i class="icon">📝</i>
+          <span class="nav-text" v-if="!isCollapsed">审批管理</span>
+        </router-link>
+        <router-link
           to="/admin/activity-publish"
           class="nav-item"
           :class="{ active: $route.path === '/admin/activity-publish' }"

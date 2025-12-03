@@ -1,6 +1,6 @@
 <template>
   <div class="health-container">
-    <el-page-header content="健康测评与指导" />
+    <div class="custom-page-header">健康测评与指导</div>
 
     <el-tabs v-model="activeTab" class="health-tabs">
       <el-tab-pane label="开始测评" name="assessment"></el-tab-pane>
@@ -920,7 +920,7 @@ const isNaN = (val) => Number.isNaN(val)
 
 .step-form {
   width: 100%;
-  max-width: 600px;
+  max-width: 800px;
 }
 
 .el-form-item {
@@ -1088,5 +1088,12 @@ const isNaN = (val) => Number.isNaN(val)
   .action-section {
     padding: 0 10px;
   }
+}
+.custom-page-header {
+  font-size: 18px; /* 保持原标题大小 */
+  color: #333; /* 标题颜色 */
+  margin-bottom: 20px; /* 与下方内容保持间距 */
+  padding: 10px 0; /* 上下内边距 */
+  font-weight: 500; /* 字体加粗 */
 }
 </style>

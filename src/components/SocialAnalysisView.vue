@@ -46,27 +46,28 @@
           <div class="stat-trend">最近: {{ commonActivityStats.recent }}</div>
         </div>
       </el-card>
-    </div>
 
-    <!-- 互动趋势图表 -->
-    <el-card class="chart-card">
-      <template v-slot:header>
-        <h3 class="card-header-title">互动趋势</h3>
-      </template>
-      <div class="chart-container">
-        <canvas id="interactionChart"></canvas>
-      </div>
-    </el-card>
+      <!-- 本周任务统计 -->
+      <el-card class="stat-card">
+        <div class="stat-item">
+          <div class="stat-icon task-icon">🎁</div>
+          <div class="stat-label">本周任务</div>
+          <div class="stat-value">{{ currentTask.progress }}/{{ currentTask.target }}</div>
+          <div class="stat-trend" :class="currentTask.completed ? 'up' : ''">
+            {{ currentTask.completed ? '已完成！奖励 +50 积分' : '进行中' }}
+          </div>
+        </div>
+      </el-card>
+    </div>
 
     <!-- 好友列表与互动 -->
     <el-card class="friends-card">
       <template v-slot:header>
         <h3 class="card-header-title">好友列表</h3>
       </template>
-      <!-- 表格容器：小屏幕横向滚动，大屏自适应 -->
       <div class="table-container">
         <el-table :data="friends" border class="friend-table" fit>
-          <el-table-column prop="name" label="好友名称" min-width="140">
+          <el-table-column prop="name" label="好友名称" min-width="110">
             <template #default="scope">
               <div class="friend-name">
                 <el-avatar :size="32" class="friend-avatar-sm">
@@ -77,8 +78,8 @@
             </template>
           </el-table-column>
 
-          <!-- 恢复进度条样式的互动频率列 -->
-          <el-table-column label="互动频率" min-width="150">
+          <!-- 互动频率列 -->
+          <el-table-column label="互动频率" min-width="180">
             <template #default="scope">
               <div class="frequency-indicator">
                 <div
@@ -93,17 +94,27 @@
             </template>
           </el-table-column>
 
-          <el-table-column prop="lastInteraction" label="最近互动" min-width="120">
+          <!-- 互动积分列 -->
+          <el-table-column label="互动积分" min-width="90">
+            <template #default="scope">
+              <div class="points-container">
+                <span class="points-icon">⭐</span>
+                <span class="points-value">{{ scope.row.points || 0 }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="lastInteraction" label="最近互动" min-width="100">
             <template #default="scope">
               {{ formatDate(scope.row.lastInteraction) }}
             </template>
           </el-table-column>
-          <el-table-column label="共同打卡" min-width="100">
+          <el-table-column label="共同打卡" min-width="90">
             <template #default="scope">
               <span class="common-checkins">{{ scope.row.commonCheckins }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="280">
+          <el-table-column label="操作" min-width="420">
             <template #default="scope">
               <div class="operation-buttons">
                 <el-button size="small" class="msg-btn" @click="sendMessage(scope.row.id)"
@@ -115,6 +126,9 @@
                   class="profile-btn"
                   @click="viewProfile(scope.row.id)"
                   >查看资料</el-button
+                >
+                <el-button size="small" class="checkin-btn" @click="commonCheckin(scope.row.id)"
+                  >共同打卡</el-button
                 >
                 <el-button
                   size="small"
@@ -128,6 +142,51 @@
             </template>
           </el-table-column>
         </el-table>
+      </div>
+    </el-card>
+
+    <!-- 新增：积分排行榜卡片 -->
+    <el-card class="ranking-card">
+      <template v-slot:header>
+        <h3 class="card-header-title">好友积分排行榜</h3>
+      </template>
+      <div class="ranking-container">
+        <!-- 排行榜列表 -->
+        <div class="ranking-list">
+          <div
+            v-for="(item, index) in sortedRanking"
+            :key="item.id"
+            :class="['ranking-item', getRankingClass(index)]"
+          >
+            <!-- 排名标识 -->
+            <div class="ranking-num">{{ index + 1 }}</div>
+            <!-- 好友头像+名称 -->
+            <div class="ranking-friend">
+              <el-avatar :size="36" class="ranking-avatar">
+                {{ item.name?.charAt(0) || '?' }}
+              </el-avatar>
+              <span class="ranking-friend-name">{{ item.name }}</span>
+            </div>
+            <!-- 积分 -->
+            <div class="ranking-points">
+              <span class="points-icon">⭐</span>
+              <span class="points-value">{{ item.points || 0 }}</span>
+            </div>
+          </div>
+          <div v-if="sortedRanking.length === 0" class="empty-ranking">
+            暂无好友数据，添加好友开始互动吧~
+          </div>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 互动趋势图表 -->
+    <el-card class="chart-card">
+      <template v-slot:header>
+        <h3 class="card-header-title">互动趋势</h3>
+      </template>
+      <div class="chart-container">
+        <canvas id="interactionChart"></canvas>
       </div>
     </el-card>
 
@@ -190,7 +249,25 @@
               >
                 {{ getFrequencyText(currentProfileFriend?.frequency || 0) }}
               </span>
+              <span class="points-display"> 积分: {{ currentProfileFriend?.points || 0 }} ⭐ </span>
             </p>
+          </div>
+        </div>
+
+        <!-- 徽章展示区 -->
+        <div class="badges-container">
+          <h4>获得徽章</h4>
+          <div class="badge-list">
+            <span
+              v-for="badge in currentProfileFriend?.badges"
+              :key="badge.name"
+              class="badge-item"
+            >
+              {{ badge.icon }} {{ badge.name }}
+            </span>
+            <span v-if="(currentProfileFriend?.badges || []).length === 0" class="no-badge">
+              暂无徽章，多互动可解锁哦~
+            </span>
           </div>
         </div>
 
@@ -262,9 +339,27 @@
         <el-button type="primary" class="confirm-btn" @click="handleAddFriend">添加</el-button>
       </template>
     </el-dialog>
+
+    <!-- 成就解锁提示弹窗 -->
+    <el-dialog
+      v-model="showAchievementModal"
+      title="🎉 解锁新成就！"
+      width="300px"
+      :close-on-click-modal="false"
+      class="achievement-modal"
+    >
+      <div class="achievement-content">
+        <div class="achievement-icon">{{ newAchievement.icon }}</div>
+        <div class="achievement-name">{{ newAchievement.name }}</div>
+        <div class="achievement-desc">{{ newAchievement.desc }}</div>
+        <div class="achievement-reward">奖励积分: +{{ newAchievement.reward }} ⭐</div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showAchievementModal = false">太棒了！</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted, reactive, watchEffect } from 'vue'
 import {
@@ -282,9 +377,8 @@ import {
 } from 'element-plus'
 import Chart from 'chart.js/auto'
 
-// 判断是否为移动设备（用于响应式适配）
+// 判断是否为移动设备
 const isMobile = ref(window.innerWidth < 768)
-// 监听窗口大小变化，实时更新设备类型
 watchEffect(() => {
   const handleResize = () => {
     isMobile.value = window.innerWidth < 768
@@ -293,69 +387,75 @@ watchEffect(() => {
   return () => window.removeEventListener('resize', handleResize)
 })
 
-// 当前用户名（从本地存储获取）
+// 当前用户名
 const currentUser = ref(localStorage.getItem('username') || '我')
 
-// 好友统计数据
-const friendStats = ref({
-  total: 0,
-  trend: 0,
+// 统计数据
+const friendStats = ref({ total: 0, trend: 0 })
+const interactionStats = ref({ monthly: 38, trend: 15 })
+const commonActivityStats = ref({ count: 5, recent: '周末跑步打卡活动' })
+
+// 本周任务数据
+const currentTask = ref({
+  target: 5, // 目标互动次数
+  progress: 0, // 当前进度
+  completed: false, // 是否完成
+  reward: 50, // 完成奖励
 })
 
-// 互动统计数据
-const interactionStats = ref({
-  monthly: 0,
-  trend: 0,
-})
-
-// 共同活动统计
-const commonActivityStats = ref({
-  count: 0,
-  recent: '无',
-})
-
-// 好友列表
+// 好友列表（含积分、徽章、连续互动记录）
 const friends = ref([])
 
-// 聊天功能相关状态
+// 聊天相关状态
 const showChatModal = ref(false)
 const currentChatFriend = ref(null)
 const inputMessage = ref('')
 const chatMessages = ref([])
 
-// 查看资料功能相关状态
+// 资料弹窗状态
 const showProfileModal = ref(false)
 const currentProfileFriend = ref(null)
 
-// 添加好友功能相关状态
+// 添加好友状态
 const showAddFriendModal = ref(false)
 const addFriendFormRef = ref(null)
-const newFriendForm = reactive({
-  name: '',
-  tags: '',
-})
+const newFriendForm = reactive({ name: '', tags: '' })
+
+// 成就解锁弹窗
+const showAchievementModal = ref(false)
+const newAchievement = ref({})
 
 // 初始化数据
 onMounted(() => {
-  loadFriendStats()
   loadInteractionStats()
   loadFriends()
   initChart()
-  isMobile.value = window.innerWidth < 768
+  loadTaskProgress()
+  checkTaskReset() // 检查任务是否需要周重置
 })
 
-// 从本地存储加载好友
+// 加载好友数据
 const loadFriends = () => {
   const savedFriends = localStorage.getItem('friends')
   if (savedFriends) {
     friends.value = JSON.parse(savedFriends)
   } else {
-    // 模拟初始数据
+    // 模拟初始数据（带积分和徽章）
     friends.value = [
       {
         id: '1',
         name: '张三',
         frequency: 85,
+        points: 230,
+        badges: [
+          { name: '互动达人', icon: '🏆', desc: '互动频率超过80%', reward: 50 },
+          { name: '默契搭档', icon: '🤝', desc: '共同打卡10次以上', reward: 30 },
+        ],
+        recentInteractions: [
+          new Date('2025-11-18').toISOString(),
+          new Date('2025-11-17').toISOString(),
+          new Date('2025-11-16').toISOString(),
+        ],
         lastInteraction: new Date('2025-11-18').toISOString(),
         commonCheckins: 12,
         joinDate: new Date('2023-01-15').toISOString(),
@@ -365,6 +465,9 @@ const loadFriends = () => {
         id: '2',
         name: '李四',
         frequency: 60,
+        points: 150,
+        badges: [{ name: '新朋友', icon: '👋', desc: '新添加的好友', reward: 20 }],
+        recentInteractions: [new Date('2025-11-17').toISOString()],
         lastInteraction: new Date('2025-11-17').toISOString(),
         commonCheckins: 8,
         joinDate: new Date('2023-03-22').toISOString(),
@@ -374,6 +477,9 @@ const loadFriends = () => {
         id: '3',
         name: '王五',
         frequency: 30,
+        points: 80,
+        badges: [],
+        recentInteractions: [new Date('2025-11-19').toISOString()],
         lastInteraction: new Date('2025-11-19').toISOString(),
         commonCheckins: 3,
         joinDate: new Date('2023-06-10').toISOString(),
@@ -383,6 +489,9 @@ const loadFriends = () => {
         id: '4',
         name: '卢汉民',
         frequency: 65,
+        points: 160,
+        badges: [{ name: '活跃分子', icon: '🔥', desc: '月度互动超过15次', reward: 40 }],
+        recentInteractions: [new Date('2025-11-26').toISOString()],
         lastInteraction: new Date('2025-11-26').toISOString(),
         commonCheckins: 2,
         joinDate: new Date('2023-09-05').toISOString(),
@@ -392,6 +501,9 @@ const loadFriends = () => {
         id: '5',
         name: '林育生',
         frequency: 40,
+        points: 95,
+        badges: [],
+        recentInteractions: [new Date('2025-11-27').toISOString()],
         lastInteraction: new Date('2025-11-27').toISOString(),
         commonCheckins: 4,
         joinDate: new Date('2023-10-12').toISOString(),
@@ -403,23 +515,67 @@ const loadFriends = () => {
   updateFriendStats()
 }
 
-// 保存好友到本地存储
+// 保存好友数据到本地存储
 const saveFriendsToLocalStorage = () => {
   localStorage.setItem('friends', JSON.stringify(friends.value))
   updateFriendStats()
+  updateTaskProgress()
 }
 
-// 更新好友统计信息
+// 更新好友统计
 const updateFriendStats = () => {
   friendStats.value.total = friends.value.length
 }
 
-// 加载好友统计
-const loadFriendStats = () => {
-  friendStats.value = {
-    total: friends.value.length,
-    trend: 2,
+// 加载任务进度
+const loadTaskProgress = () => {
+  const savedProgress = localStorage.getItem('interactionTask')
+  if (savedProgress) {
+    currentTask.value = JSON.parse(savedProgress)
+  } else {
+    currentTask.value = { target: 5, progress: 0, completed: false, reward: 50 }
+    saveTaskProgress()
   }
+}
+
+// 保存任务进度
+const saveTaskProgress = () => {
+  localStorage.setItem('interactionTask', JSON.stringify(currentTask.value))
+}
+
+// 更新任务进度
+const updateTaskProgress = () => {
+  if (!currentTask.value.completed) {
+    currentTask.value.progress = Math.min(currentTask.value.progress + 1, currentTask.value.target)
+    if (currentTask.value.progress >= currentTask.value.target) {
+      currentTask.value.completed = true
+      addUserPoints(currentTask.value.reward)
+      ElMessage.success(`🎉 完成本周互动任务，获得 ${currentTask.value.reward} 积分奖励！`)
+    }
+    saveTaskProgress()
+  }
+}
+
+// 任务周重置检查（每周一0点重置）
+const checkTaskReset = () => {
+  const lastResetDate = localStorage.getItem('taskLastReset')
+  const today = new Date()
+  const isMonday = today.getDay() === 1 // 1=周一
+  const now = today.getTime()
+
+  // 首次使用或已过一周，重置任务
+  if (!lastResetDate || isMonday || now - parseInt(lastResetDate) > 7 * 24 * 60 * 60 * 1000) {
+    currentTask.value = { target: 5, progress: 0, completed: false, reward: 50 }
+    saveTaskProgress()
+    localStorage.setItem('taskLastReset', now.toString())
+  }
+}
+
+// 用户全局积分
+const addUserPoints = (points) => {
+  let userPoints = parseInt(localStorage.getItem('userTotalPoints') || '0')
+  userPoints += points
+  localStorage.setItem('userTotalPoints', userPoints.toString())
 }
 
 // 删除好友
@@ -444,15 +600,8 @@ const deleteFriend = (friendId) => {
 
 // 加载互动统计
 const loadInteractionStats = () => {
-  interactionStats.value = {
-    monthly: 38,
-    trend: 15,
-  }
-
-  commonActivityStats.value = {
-    count: 5,
-    recent: '周末跑步打卡活动',
-  }
+  interactionStats.value = { monthly: 38, trend: 15 }
+  commonActivityStats.value = { count: 5, recent: '周末跑步打卡活动' }
 }
 
 // 初始化图表
@@ -472,8 +621,6 @@ const initChart = () => {
           tension: 0.4,
           fill: true,
           pointBackgroundColor: '#409eff',
-          pointRadius: 4,
-          pointHoverRadius: 6,
         },
         {
           label: '共同打卡',
@@ -483,8 +630,6 @@ const initChart = () => {
           tension: 0.4,
           fill: true,
           pointBackgroundColor: '#52c41a',
-          pointRadius: 4,
-          pointHoverRadius: 6,
         },
       ],
     },
@@ -492,51 +637,18 @@ const initChart = () => {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            font: {
-              size: 14,
-              family: 'Inter, sans-serif',
-            },
-            padding: 20,
-          },
-        },
-        tooltip: {
-          padding: 12,
-          boxPadding: 4,
-          titleFont: { size: 14 },
-          bodyFont: { size: 13 },
-          cornerRadius: 8,
-          displayColors: true,
-        },
+        legend: { position: 'top' },
+        tooltip: { cornerRadius: 8 },
       },
       scales: {
-        y: {
-          beginAtZero: true,
-          grid: {
-            color: 'rgba(0, 0, 0, 0.05)',
-          },
-          ticks: {
-            padding: 10,
-            font: { size: 12 },
-          },
-        },
-        x: {
-          grid: {
-            display: false,
-          },
-          ticks: {
-            padding: 10,
-            font: { size: 12 },
-          },
-        },
+        y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+        x: { grid: { display: false } },
       },
     },
   })
 }
 
-// 格式化日期（统一格式：年/月/日）
+// 格式化日期
 const formatDate = (dateString) => {
   if (!dateString) return '暂无'
   const date = new Date(dateString)
@@ -551,12 +663,57 @@ const getFrequencyText = (value) => {
   return '较少'
 }
 
-// 根据频率获取对应颜色
+// 获取互动频率颜色
 const getFrequencyColor = (value) => {
-  if (value >= 80) return '#409eff' // 蓝色（频繁）
-  if (value >= 50) return '#52c41a' // 绿色（较多）
-  if (value >= 20) return '#faad14' // 黄色（一般）
-  return '#f5222d' // 红色（较少）
+  if (value >= 80) return '#409eff'
+  if (value >= 50) return '#52c41a'
+  if (value >= 20) return '#faad14'
+  return '#f5222d'
+}
+
+// 检查并解锁徽章
+const checkAndUnlockBadge = (friend, type) => {
+  const badges = friend.badges || []
+  let newBadge = null
+
+  switch (type) {
+    case 'frequency':
+      if (friend.frequency >= 80 && !badges.some((b) => b.name === '互动达人')) {
+        newBadge = { name: '互动达人', icon: '🏆', desc: '互动频率超过80%', reward: 50 }
+      }
+      break
+    case 'points':
+      if (friend.points >= 200 && !badges.some((b) => b.name === '积分达人')) {
+        newBadge = { name: '积分达人', icon: '⭐', desc: '互动积分达到200分', reward: 30 }
+      }
+      break
+    case 'checkins':
+      if (friend.commonCheckins >= 10 && !badges.some((b) => b.name === '默契搭档')) {
+        newBadge = { name: '默契搭档', icon: '🤝', desc: '共同打卡10次以上', reward: 40 }
+      }
+      if (friend.commonCheckins >= 30 && !badges.some((b) => b.name === '铁杆搭档')) {
+        newBadge = { name: '铁杆搭档', icon: '💪', desc: '共同打卡30次以上', reward: 100 }
+      }
+      break
+    case 'continuous': {
+      const last3Days = new Date()
+      last3Days.setDate(last3Days.getDate() - 3)
+      const validInteractions =
+        friend.recentInteractions?.filter((date) => new Date(date) >= last3Days) || []
+      if (validInteractions.length >= 3 && !badges.some((b) => b.name === '持续互动')) {
+        newBadge = { name: '持续互动', icon: '⏳', desc: '连续3天互动', reward: 30 }
+      }
+      break
+    }
+  }
+
+  if (newBadge) {
+    friend.badges = [...badges, newBadge]
+    friend.points = (friend.points || 0) + newBadge.reward
+    newAchievement.value = newBadge
+    showAchievementModal.value = true
+    saveFriendsToLocalStorage()
+  }
 }
 
 // 发消息功能
@@ -576,18 +733,34 @@ const sendChatMessage = () => {
     return
   }
 
-  chatMessages.value.push({
-    sender: 'me',
-    content: inputMessage.value.trim(),
-  })
-
+  // 添加消息
+  chatMessages.value.push({ sender: 'me', content: inputMessage.value.trim() })
   inputMessage.value = ''
-  // 更新互动频率
+
+  // 更新好友数据
   const friendIndex = friends.value.findIndex((f) => f.id === currentChatFriend.value.id)
   if (friendIndex !== -1) {
+    // 增加互动频率
     friends.value[friendIndex].frequency = Math.min(friends.value[friendIndex].frequency + 5, 100)
+    // 增加积分
+    friends.value[friendIndex].points = (friends.value[friendIndex].points || 0) + 10
+    // 更新最近互动记录
+    friends.value[friendIndex].recentInteractions = [
+      new Date().toISOString(),
+      ...(friends.value[friendIndex].recentInteractions || []).slice(0, 2), // 保留最近3条
+    ]
+    // 更新最近互动时间
+    friends.value[friendIndex].lastInteraction = new Date().toISOString()
+    // 检查徽章解锁
+    checkAndUnlockBadge(friends.value[friendIndex], 'frequency')
+    checkAndUnlockBadge(friends.value[friendIndex], 'points')
+    checkAndUnlockBadge(friends.value[friendIndex], 'continuous')
+    // 保存数据
     saveFriendsToLocalStorage()
+    // 更新任务进度
+    updateTaskProgress()
   }
+
   // 滚动到最新消息
   setTimeout(() => {
     const messageList = document.querySelector('.chat-message-list')
@@ -605,11 +778,7 @@ const sendChatMessage = () => {
       '最近新出的活动你参加了吗？',
     ]
     const randomReply = replies[Math.floor(Math.random() * replies.length)]
-    chatMessages.value.push({
-      sender: 'friend',
-      content: randomReply,
-    })
-    // 滚动到最新消息
+    chatMessages.value.push({ sender: 'friend', content: randomReply })
     setTimeout(() => {
       const messageList = document.querySelector('.chat-message-list')
       messageList.scrollTop = messageList.scrollHeight
@@ -630,17 +799,19 @@ const viewProfile = (friendId) => {
 const handleAddFriend = async () => {
   await addFriendFormRef.value.validate((valid) => {
     if (valid) {
-      // 处理标签
       const tagsArray = newFriendForm.tags
         .split(',')
         .map((tag) => tag.trim())
         .filter((tag) => tag)
 
-      // 创建新好友
+      // 新好友默认带"新朋友"徽章
       const newFriend = {
         id: Date.now().toString(),
         name: newFriendForm.name,
         frequency: Math.floor(Math.random() * 40) + 10,
+        points: 20, // 新好友初始积分
+        badges: [{ name: '新朋友', icon: '👋', desc: '新添加的好友', reward: 20 }],
+        recentInteractions: [new Date().toISOString()],
         lastInteraction: new Date().toISOString(),
         commonCheckins: Math.floor(Math.random() * 5),
         joinDate: new Date().toISOString(),
@@ -649,8 +820,7 @@ const handleAddFriend = async () => {
 
       friends.value.push(newFriend)
       saveFriendsToLocalStorage()
-
-      ElMessage.success('好友添加成功！')
+      ElMessage.success('好友添加成功！获得20积分奖励~')
       showAddFriendModal.value = false
       newFriendForm.name = ''
       newFriendForm.tags = ''
@@ -660,8 +830,73 @@ const handleAddFriend = async () => {
     }
   })
 }
-</script>
 
+// 共同打卡功能
+const commonCheckin = (friendId) => {
+  const friend = friends.value.find((f) => f.id === friendId)
+  if (!friend) return
+
+  // 增加共同打卡次数
+  friend.commonCheckins = (friend.commonCheckins || 0) + 1
+  // 增加积分（每次打卡+15分）
+  friend.points = (friend.points || 0) + 15
+  // 更新最近互动记录
+  friend.recentInteractions = [
+    new Date().toISOString(),
+    ...(friend.recentInteractions || []).slice(0, 2),
+  ]
+  // 更新最近互动时间
+  friend.lastInteraction = new Date().toISOString()
+  // 检查"默契搭档"/"铁杆搭档"徽章
+  checkAndUnlockBadge(friend, 'checkins')
+  checkAndUnlockBadge(friend, 'continuous')
+  // 更新任务进度
+  updateTaskProgress()
+  // 保存数据
+  saveFriendsToLocalStorage()
+  ElMessage.success(`与${friend.name}共同打卡成功，获得15积分！`)
+}
+
+// 新增：获取当前用户自己的积分
+const userSelfPoints = ref(parseInt(localStorage.getItem('userTotalPoints') || '0'))
+
+// 新增：计算积分排行榜（自己+好友一起排名，按积分降序）
+const sortedRanking = ref([])
+
+// 监听好友数据/自己积分变化，实时更新排行榜
+watchEffect(() => {
+  // 1. 同步自己的最新积分
+  userSelfPoints.value = parseInt(localStorage.getItem('userTotalPoints') || '0')
+
+  // 2. 构建自己的排名条目（id设为特殊值避免冲突）
+  const selfItem = {
+    id: 'user-self',
+    name: currentUser.value,
+    points: userSelfPoints.value,
+    isSelf: true, // 标记为当前用户自己
+  }
+
+  // 3. 合并自己和好友数据（过滤重复id，防止冲突）
+  const allRankingData = [selfItem, ...friends.value.filter((friend) => friend.id !== 'user-self')]
+
+  // 4. 按积分降序排序（积分相同则自己优先）
+  sortedRanking.value = allRankingData.sort((a, b) => {
+    const pointsDiff = (b.points || 0) - (a.points || 0)
+    if (pointsDiff !== 0) return pointsDiff
+    // 积分相同时，自己排在前面
+    return a.isSelf ? -1 : 1
+  })
+})
+
+// 新增：获取排名样式（前三名特殊样式，自己的条目额外加标识）
+const getRankingClass = (index, isSelf) => {
+  const baseClass = isSelf ? 'ranking-self' : ''
+  if (index === 0) return `${baseClass} ranking-first`
+  if (index === 1) return `${baseClass} ranking-second`
+  if (index === 2) return `${baseClass} ranking-third`
+  return `${baseClass} ranking-other`
+}
+</script>
 <style scoped>
 /* 全局样式：确保容器填满父元素 */
 * {
@@ -1382,5 +1617,148 @@ const handleAddFriend = async () => {
   .el-dialog__title {
     font-size: 14px !important;
   }
+}
+/* 在<style scoped>中添加 */
+.checkin-btn {
+  background-color: #f0f9fb !important;
+  color: #52c41a !important;
+  border-color: #d1f2eb !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+  flex: 1;
+  min-width: 80px;
+}
+
+.checkin-btn:hover {
+  background-color: #d1f2eb !important;
+  border-color: #a7e8d4 !important;
+}
+
+/* 排行榜卡片样式 */
+.ranking-card {
+  margin-bottom: 30px;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05) !important;
+  border: none !important;
+  padding: 20px;
+  width: 100%;
+  background-color: #fff !important;
+}
+
+.ranking-container {
+  width: 100%;
+}
+
+/* 排行榜列表 */
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+/* 排行榜项 */
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.ranking-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 前三名特殊样式 */
+.ranking-first {
+  background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
+  border: 1px solid #ffeeba;
+}
+
+.ranking-second {
+  background: linear-gradient(135deg, #e8f5e9 0%, #d4edda 100%);
+  border: 1px solid #c3e6cb;
+}
+
+.ranking-third {
+  background: linear-gradient(135deg, #fce4ec 0%, #f8d7da 100%);
+  border: 1px solid #f5c6cb;
+}
+
+/* 排名数字 */
+.ranking-num {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ranking-first .ranking-num {
+  background-color: #ffc107;
+}
+
+.ranking-second .ranking-num {
+  background-color: #6c757d;
+}
+
+.ranking-third .ranking-num {
+  background-color: #dc3545;
+}
+
+.ranking-other .ranking-num {
+  background-color: #409eff;
+}
+
+/* 好友信息 */
+.ranking-friend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.ranking-avatar {
+  background-color: #e8f4f8 !important;
+  color: #409eff !important;
+  font-size: 16px !important;
+}
+
+.ranking-friend-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d2129;
+}
+
+/* 积分展示 */
+.ranking-points {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d2129;
+}
+
+.ranking-points .points-icon {
+  font-size: 16px;
+  color: #faad14;
+}
+
+/* 空数据提示 */
+.empty-ranking {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
 }
 </style>

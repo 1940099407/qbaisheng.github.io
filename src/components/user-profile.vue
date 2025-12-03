@@ -9,12 +9,11 @@
             <h2>编辑资料</h2>
           </div>
           <div class="module-card">
-            <el-form :model="formData" label-width="90px" class="profile-form">
+            <el-form :model="formData" label-width="90px" class="profile-form" ref="profileForm">
               <!-- 头像上传 -->
               <el-form-item label="头像" class="form-item">
                 <div class="avatar-wrap">
                   <img :src="formData.avatar" alt="用户头像" class="avatar" />
-                  <!-- 1. 给input加id，label通过for关联，点击label会自动触发input点击 -->
                   <label class="avatar-upload-btn" for="avatar-upload-input">
                     <i class="upload-icon"></i>
                     <input
@@ -28,6 +27,16 @@
                 </div>
               </el-form-item>
 
+              <!-- 用户名（不可修改） -->
+              <el-form-item label="用户名" class="form-item">
+                <el-input
+                  v-model="formData.username"
+                  disabled
+                  class="custom-input"
+                  placeholder="系统分配"
+                />
+              </el-form-item>
+
               <!-- 昵称 -->
               <el-form-item label="昵称" class="form-item">
                 <el-input
@@ -35,8 +44,9 @@
                   maxlength="36"
                   placeholder="请输入昵称"
                   class="custom-input"
+                  @input="updateNicknameCount"
                 />
-                <span class="char-count">{{ formData.nickname.length }}/36</span>
+                <span class="char-count">{{ nicknameCount }}/36</span>
               </el-form-item>
 
               <!-- 个性签名 -->
@@ -48,8 +58,9 @@
                   rows="2"
                   placeholder="分享你的状态或爱好"
                   class="custom-textarea"
+                  @input="updateSignatureCount"
                 />
-                <span class="char-count">{{ formData.signature.length }}/80</span>
+                <span class="char-count">{{ signatureCount }}/80</span>
               </el-form-item>
 
               <!-- 性别 -->
@@ -81,7 +92,7 @@
           </div>
         </section>
 
-        <!-- 打卡提醒设置（支持自定义时间） -->
+        <!-- 打卡提醒设置 -->
         <section class="setting-module">
           <div class="module-header">
             <div class="header-icon"></div>
@@ -113,6 +124,7 @@
                   end: '22:00',
                   step: '00:15',
                 }"
+                @change="saveReminderSetting"
               />
             </div>
 
@@ -126,7 +138,7 @@
           </div>
         </section>
 
-        <!-- 我的成就（6个成就，含新增2个） -->
+        <!-- 我的成就 -->
         <section class="setting-module">
           <div class="module-header">
             <div class="header-icon"></div>
@@ -134,124 +146,256 @@
           </div>
           <div class="module-card">
             <div class="achievements-grid">
-              <!-- 初露锋芒（已解锁） -->
-              <div class="achievement-card unlocked">
-                <div class="achievement-icon star-icon"></div>
+              <div
+                class="achievement-card"
+                :class="{ unlocked: item.status === 'unlocked' }"
+                v-for="item in achievements"
+                :key="item.id"
+              >
+                <div class="achievement-icon" :class="getIconClass(item.id)"></div>
                 <div class="achievement-info">
-                  <h3 class="achievement-name">初露锋芒</h3>
-                  <p class="achievement-desc">完成首次打卡</p>
-                  <p class="achievement-status">已解锁 · 2025/11/18</p>
-                </div>
-              </div>
+                  <h3 class="achievement-name">{{ item.name }}</h3>
+                  <p class="achievement-desc">{{ item.desc }}</p>
 
-              <!-- 坚持不懈（进度中） -->
-              <div class="achievement-card">
-                <div class="achievement-icon calendar-icon"></div>
-                <div class="achievement-info">
-                  <h3 class="achievement-name">坚持不懈</h3>
-                  <p class="achievement-desc">连续打卡7天</p>
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: (2 / 7) * 100 + '%' }"></div>
-                  </div>
-                  <p class="progress-text">进度：2/7</p>
-                </div>
-              </div>
+                  <template v-if="item.status === 'unlocked'">
+                    <p class="achievement-status">已解锁 · {{ item.unlockTime }}</p>
+                  </template>
 
-              <!-- 打卡达人（进度中） -->
-              <div class="achievement-card">
-                <div class="achievement-icon trophy-icon"></div>
-                <div class="achievement-info">
-                  <h3 class="achievement-name">打卡达人</h3>
-                  <p class="achievement-desc">累计打卡30次</p>
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: (17 / 30) * 100 + '%' }"></div>
-                  </div>
-                  <p class="progress-text">进度：17/30</p>
-                </div>
-              </div>
-
-              <!-- 全勤模范（未解锁） -->
-              <div class="achievement-card">
-                <div class="achievement-icon chart-icon"></div>
-                <div class="achievement-info">
-                  <h3 class="achievement-name">全勤模范</h3>
-                  <p class="achievement-desc">完成1次周全勤</p>
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: '0%' }"></div>
-                  </div>
-                  <p class="progress-text">进度：0/1</p>
-                </div>
-              </div>
-
-              <!-- 新增：百日打卡（进度中） -->
-              <div class="achievement-card">
-                <div class="achievement-icon hundred-icon"></div>
-                <div class="achievement-info">
-                  <h3 class="achievement-name">百日打卡</h3>
-                  <p class="achievement-desc">累计打卡100次</p>
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: (17 / 100) * 100 + '%' }"></div>
-                  </div>
-                  <p class="progress-text">进度：17/100</p>
-                </div>
-              </div>
-
-              <!-- 新增：连续王者（进度中） -->
-              <div class="achievement-card">
-                <div class="achievement-icon streak-icon"></div>
-                <div class="achievement-info">
-                  <h3 class="achievement-name">连续王者</h3>
-                  <p class="achievement-desc">连续打卡30天</p>
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: (2 / 30) * 100 + '%' }"></div>
-                  </div>
-                  <p class="progress-text">进度：2/30</p>
+                  <template v-else>
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        :style="{ width: (item.current / item.target) * 100 + '%' }"
+                      ></div>
+                    </div>
+                    <p class="progress-text">进度：{{ item.current }}/{{ item.target }}</p>
+                  </template>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        <!-- 账户安全 -->
+        <section class="setting-module">
+          <div class="module-header">
+            <div class="header-icon"></div>
+            <h2>账户安全</h2>
+          </div>
+          <div class="module-card security-card">
+            <div class="security-item">
+              <span class="security-label">修改密码</span>
+              <el-button type="text" @click="showPwdDialog = true">
+                立即修改 <i class="el-icon-arrow-right"></i>
+              </el-button>
+            </div>
+            <div class="security-item">
+              <span class="security-label">绑定手机号</span>
+              <div class="security-content">
+                <span v-if="formData.phone">{{ hidePhone(formData.phone) }}</span>
+                <span v-else class="unbound">未绑定</span>
+                <el-button type="text" @click="handleBindPhone">
+                  {{ formData.phone ? '更换' : '绑定' }} <i class="el-icon-arrow-right"></i>
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 密码修改弹窗 -->
+        <el-dialog
+          v-model="showPwdDialog"
+          title="修改密码"
+          width="400px"
+          :close-on-click-modal="false"
+        >
+          <el-form :model="pwdForm" ref="pwdFormRef" label-width="100px" class="password-form">
+            <el-form-item
+              label="原密码"
+              prop="oldPwd"
+              :rules="[{ required: true, message: '请输入原密码', trigger: 'blur' }]"
+            >
+              <el-input v-model="pwdForm.oldPwd" type="password" show-password />
+            </el-form-item>
+            <el-form-item
+              label="新密码"
+              prop="newPwd"
+              :rules="[
+                { required: true, message: '请输入新密码', trigger: 'blur' },
+                { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+              ]"
+            >
+              <el-input v-model="pwdForm.newPwd" type="password" show-password />
+            </el-form-item>
+            <el-form-item
+              label="确认密码"
+              prop="confirmPwd"
+              :rules="[
+                { required: true, message: '请确认新密码', trigger: 'blur' },
+                { validator: validateConfirm, trigger: 'blur' },
+              ]"
+            >
+              <el-input v-model="pwdForm.confirmPwd" type="password" show-password />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="showPwdDialog = false">取消</el-button>
+            <el-button type="primary" @click="submitPwdChange">确认修改</el-button>
+          </template>
+        </el-dialog>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import {
-  ElMessage,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElRadioGroup,
-  ElRadio,
-  ElDatePicker,
-  ElButton,
-  ElSwitch,
-  ElTimePicker,
-} from 'element-plus'
+import { reactive, ref, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 
-// 表单数据（全局统一头像数据源）
+// 路由实例
+const router = useRouter()
+
+// 表单数据
 const formData = reactive({
+  username: '', // 用户名（唯一标识）
   avatar: 'https://picsum.photos/200/200?random=6',
   nickname: '秦百胜',
   signature: '',
   gender: 'female',
   birthday: '2003-08-03',
+  phone: '', // 手机号字段
 })
 
-// 提醒设置（新增自定义时间）
+// 提醒设置
 const reminderData = reactive({
   enabled: false,
-  time: '08:30', // 默认提醒时间
+  time: '08:30',
 })
 
-// // 头像上传触发
-// const triggerAvatarUpload = () => {
-//   document.querySelector('.avatar-file').click()
-// }
+// 成就数据
+const achievements = reactive([
+  {
+    id: 'firstCheckin',
+    name: '初露锋芒',
+    desc: '完成首次打卡',
+    status: 'unlocked',
+    unlockTime: '2025/11/18',
+  },
+  {
+    id: 'sevenDays',
+    name: '坚持不懈',
+    desc: '连续打卡7天',
+    current: 2,
+    target: 7,
+    status: 'locked',
+  },
+  {
+    id: 'thirtyTimes',
+    name: '打卡达人',
+    desc: '累计打卡30次',
+    current: 17,
+    target: 30,
+    status: 'locked',
+  },
+  {
+    id: 'fullWeek',
+    name: '全勤模范',
+    desc: '完成1次周全勤',
+    current: 0,
+    target: 1,
+    status: 'locked',
+  },
+  {
+    id: 'hundredTimes',
+    name: '百日打卡',
+    desc: '累计打卡100次',
+    current: 17,
+    target: 100,
+    status: 'locked',
+  },
+  {
+    id: 'thirtyDays',
+    name: '连续王者',
+    desc: '连续打卡30天',
+    current: 2,
+    target: 30,
+    status: 'locked',
+  },
+])
 
-// 头像上传处理（同步更新右上角头像）
+// 计数状态
+const nicknameCount = ref(0)
+const signatureCount = ref(0)
+
+// 密码弹窗控制
+const showPwdDialog = ref(false)
+// 密码表单数据
+const pwdForm = reactive({
+  oldPwd: '',
+  newPwd: '',
+  confirmPwd: '',
+})
+// 密码表单引用
+const pwdFormRef = ref(null)
+
+// 初始化
+onMounted(() => {
+  initUserInfo()
+  loadUserData()
+  loadReminderData()
+  loadAchievements()
+  updateNicknameCount()
+  updateSignatureCount()
+})
+
+// 初始化用户信息（从登录状态获取用户名）
+const initUserInfo = () => {
+  const username = localStorage.getItem('username')
+  if (!username) {
+    router.push('/login')
+    return
+  }
+  formData.username = username
+}
+
+// 加载用户数据
+const loadUserData = () => {
+  const savedUser = localStorage.getItem('userProfile')
+  if (savedUser) {
+    const parsed = JSON.parse(savedUser)
+    Object.assign(formData, parsed)
+  }
+}
+
+// 加载提醒设置
+const loadReminderData = () => {
+  const savedReminder = localStorage.getItem('checkinReminder')
+  if (savedReminder) {
+    Object.assign(reminderData, JSON.parse(savedReminder))
+  }
+}
+
+// 加载成就数据
+const loadAchievements = () => {
+  const savedAchieve = localStorage.getItem('userAchievements')
+  if (savedAchieve) {
+    const parsed = JSON.parse(savedAchieve)
+    achievements.forEach((item, index) => {
+      if (parsed[index]) Object.assign(item, parsed[index])
+    })
+  }
+}
+
+// 更新计数
+const updateNicknameCount = () => {
+  nicknameCount.value = formData.nickname.length
+}
+const updateSignatureCount = () => {
+  signatureCount.value = formData.signature.length
+}
+
+// 头像上传
 const handleAvatarUpload = (e) => {
   const file = e.target.files[0]
   if (!file) return
@@ -268,10 +412,10 @@ const handleAvatarUpload = (e) => {
     return
   }
 
-  // 预览并同步头像
   const reader = new FileReader()
   reader.onload = (ev) => {
     formData.avatar = ev.target.result
+    saveProfileToStorage()
     ElMessage.success('头像更新成功')
   }
   reader.readAsDataURL(file)
@@ -279,19 +423,101 @@ const handleAvatarUpload = (e) => {
 
 // 保存资料
 const saveProfile = () => {
+  if (!formData.nickname.trim()) {
+    ElMessage.error('昵称不能为空')
+    return
+  }
+  saveProfileToStorage()
   ElMessage.success('资料保存成功')
 }
 
-// 提醒开关状态变化回调
+// 保存到本地存储
+const saveProfileToStorage = () => {
+  localStorage.setItem('userProfile', JSON.stringify(formData))
+}
+
+// 提醒设置变更
 const handleReminderChange = (value) => {
-  if (value) {
-    ElMessage.info(`已开启每日${reminderData.time}提醒`)
+  saveReminderSetting()
+  ElMessage.info(value ? `已开启每日${reminderData.time}提醒` : '已关闭每日打卡提醒')
+}
+
+// 保存提醒设置
+const saveReminderSetting = () => {
+  localStorage.setItem('checkinReminder', JSON.stringify(reminderData))
+}
+
+// 成就图标映射
+const getIconClass = (id) => {
+  const iconMap = {
+    firstCheckin: 'star-icon',
+    sevenDays: 'calendar-icon',
+    thirtyTimes: 'trophy-icon',
+    fullWeek: 'chart-icon',
+    hundredTimes: 'hundred-icon',
+    thirtyDays: 'streak-icon',
+  }
+  return iconMap[id]
+}
+
+// 账户安全相关：手机号绑定/更换
+const handleBindPhone = () => {
+  ElMessageBox.prompt('请输入手机号', formData.phone ? '更换手机号' : '绑定手机号', {
+    inputPattern: /^1[3-9]\d{9}$/,
+    inputErrorMessage: '请输入正确的手机号',
+  }).then(({ value }) => {
+    formData.phone = value
+    saveProfileToStorage()
+    ElMessage.success(`${formData.phone ? '更换' : '绑定'}成功`)
+  })
+}
+
+// 密码弹窗相关：确认密码验证
+const validateConfirm = (rule, value, callback) => {
+  if (value !== pwdForm.newPwd) {
+    callback(new Error('两次输入的密码不一致'))
   } else {
-    ElMessage.info('已关闭每日打卡提醒')
+    callback()
   }
 }
-</script>
 
+// 提交密码修改
+const submitPwdChange = () => {
+  pwdFormRef.value.validate((valid) => {
+    if (!valid) return
+
+    // 从本地存储获取原密码（实际项目中应从接口验证）
+    const storedPwd = localStorage.getItem('userPassword') || '123456' // 假设初始密码为123456
+
+    // 验证原密码
+    if (pwdForm.oldPwd !== storedPwd) {
+      ElMessage.error('原密码输入错误')
+      return
+    }
+
+    // 保存新密码
+    localStorage.setItem('userPassword', pwdForm.newPwd)
+    ElMessage.success('密码修改成功')
+    showPwdDialog.value = false
+    // 重置表单
+    pwdFormRef.value.resetFields()
+  })
+}
+
+// 手机号隐藏处理
+const hidePhone = (value) => {
+  if (!value) return ''
+  return value.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1****$3')
+}
+
+// 监听提醒时间变化
+watch(
+  () => reminderData.time,
+  () => {
+    if (reminderData.enabled) saveReminderSetting()
+  },
+)
+</script>
 <style scoped>
 /* 顶部导航栏样式 */
 .top-nav {
@@ -406,6 +632,7 @@ const handleReminderChange = (value) => {
   align-items: center;
   justify-content: center;
   color: #fff;
+  cursor: pointer;
 }
 
 .upload-icon {
@@ -580,7 +807,6 @@ const handleReminderChange = (value) => {
   background-position: center;
 }
 
-/* 新增成就图标样式 */
 .hundred-icon {
   background-color: #c7d2fe;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='%234338ca' stroke='%234338ca' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3Cpolyline points='10 9 9 9 8 9'/%3E%3C/svg%3E");
@@ -642,6 +868,39 @@ const handleReminderChange = (value) => {
   margin: 0;
 }
 
+/* 账户安全模块 */
+.security-card {
+  padding: 16px 24px;
+}
+
+.security-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.security-item:last-child {
+  border-bottom: none;
+}
+
+.security-label {
+  font-size: 14px;
+  color: #374151;
+}
+
+.security-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.unbound {
+  color: #ef4444;
+  font-size: 14px;
+}
+
 /* 响应式适配 */
 @media (max-width: 768px) {
   .achievements-grid {
@@ -661,7 +920,8 @@ const handleReminderChange = (value) => {
   }
 
   .reminder-item,
-  .reminder-time-item {
+  .reminder-time-item,
+  .security-content {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -670,5 +930,9 @@ const handleReminderChange = (value) => {
   .time-picker {
     width: 100%;
   }
+}
+/* 密码表单样式补充 */
+.password-form {
+  margin-top: 16px;
 }
 </style>

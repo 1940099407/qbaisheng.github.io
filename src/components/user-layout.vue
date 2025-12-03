@@ -39,9 +39,13 @@
           <i class="icon">🏥</i>
           <span class="nav-text" v-if="!isCollapsed">健康测评</span>
         </router-link>
+        <router-link to="/approval-application" class="nav-item">
+          <i class="icon">📋</i>
+          <span class="nav-text">审批申请</span>
+        </router-link>
         <router-link to="/profile" class="nav-item" :class="{ active: $route.path === '/profile' }">
           <i class="icon">👤</i>
-          <span class="nav-text" v-if="!isCollapsed">个人资料</span>
+          <span class="nav-text" v-if="!isCollapsed">个人中心</span>
         </router-link>
         <router-link
           to="/statistics"
