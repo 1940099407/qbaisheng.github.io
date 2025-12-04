@@ -1,7 +1,7 @@
 <template>
   <div class="social-analysis-container">
     <div class="page-header">
-      <h2>社交分享</h2>
+      <h2>互动交流</h2>
       <el-button
         type="primary"
         icon="Plus"

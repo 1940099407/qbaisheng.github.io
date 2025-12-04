@@ -13,7 +13,7 @@
       <nav class="nav-menu">
         <router-link to="/checkin" class="nav-item" :class="{ active: $route.path === '/checkin' }">
           <i class="icon">📝</i>
-          <span class="nav-text" v-if="!isCollapsed">打卡</span>
+          <span class="nav-text" v-if="!isCollapsed">打卡提交</span>
         </router-link>
         <router-link to="/record" class="nav-item" :class="{ active: $route.path === '/record' }">
           <i class="icon">📊</i>
@@ -29,7 +29,7 @@
         </router-link>
         <router-link to="/social" class="nav-item" :class="{ active: $route.path === '/social' }">
           <i class="icon">👥</i>
-          <span class="nav-text" v-if="!isCollapsed">社交分享</span>
+          <span class="nav-text" v-if="!isCollapsed">互动交流</span>
         </router-link>
         <router-link
           to="/health-assessment"
@@ -41,7 +41,7 @@
         </router-link>
         <router-link to="/approval-application" class="nav-item">
           <i class="icon">📋</i>
-          <span class="nav-text">审批申请</span>
+          <span class="nav-text" v-if="!isCollapsed">申请发起 </span>
         </router-link>
         <router-link to="/profile" class="nav-item" :class="{ active: $route.path === '/profile' }">
           <i class="icon">👤</i>

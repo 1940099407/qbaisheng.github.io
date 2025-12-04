@@ -1,7 +1,7 @@
 <template>
   <div class="approval-application">
     <el-card>
-      <h2>审批申请</h2>
+      <h2>申请发起</h2>
       <el-form ref="approvalForm" :model="form" label-width="120px" class="approval-form">
         <el-form-item
           label="申请类型"
