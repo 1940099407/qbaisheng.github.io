@@ -2,6 +2,10 @@
   <div class="social-analysis-container">
     <div class="page-header">
       <h2>互动交流</h2>
+      <!-- 积分兑换中心按钮 -->
+      <el-button type="primary" icon="Gift" @click="showRewardCenter = true" class="add-friend-btn">
+        积分兑换
+      </el-button>
       <el-button
         type="primary"
         icon="Plus"
@@ -145,6 +149,66 @@
       </div>
     </el-card>
 
+    <!-- 积分兑换中心弹窗 -->
+    <el-dialog
+      v-model="showRewardCenter"
+      title="积分兑换中心"
+      :width="isMobile ? '90%' : '600px'"
+      class="reward-center-modal"
+      :close-on-click-modal="false"
+    >
+      <div class="reward-center-header">
+        <div class="user-points">
+          我的积分: <span class="points-value">{{ userSelfPoints }} ⭐</span>
+        </div>
+        <div class="reward-tips">
+          <i class="el-icon-info"></i>
+          <span>使用积分兑换专属奖励，让互动更有趣！</span>
+        </div>
+      </div>
+
+      <div class="rewards-grid">
+        <!-- 奖励卡片 - 聊天特效 -->
+        <el-card
+          v-for="reward in availableRewards"
+          :key="reward.id"
+          :class="['reward-card', hasOwnedReward(reward.id) ? 'owned' : '']"
+        >
+          <div class="reward-item">
+            <div class="reward-icon-large">{{ reward.icon }}</div>
+            <div class="reward-info">
+              <h4 class="reward-name">{{ reward.name }}</h4>
+              <p class="reward-desc">{{ reward.desc }}</p>
+            </div>
+            <div class="reward-meta">
+              <span class="reward-cost"> <i class="el-icon-star-on"></i> {{ reward.cost }} </span>
+              <span class="reward-type">{{ reward.type }}</span>
+            </div>
+            <el-button
+              type="primary"
+              @click="openExchangeConfirm(reward)"
+              :disabled="hasOwnedReward(reward.id) || userSelfPoints < reward.cost"
+            >
+              {{ hasOwnedReward(reward.id) ? '已拥有' : '兑换' }}
+            </el-button>
+          </div>
+        </el-card>
+      </div>
+    </el-dialog>
+
+    <!-- 修改聊天消息样式，支持特效展示 -->
+    <div
+      v-for="(msg, idx) in chatMessages"
+      :key="idx"
+      :class="[
+        'chat-message-item',
+        msg.sender === 'me' ? 'me' : 'friend',
+        msg.effect === 'effect1' ? 'effect-bubble' : '',
+        msg.effect === 'effect2' ? 'effect-animation' : '',
+      ]"
+    >
+      <!-- 消息内容保持不变 -->
+    </div>
     <!-- 新增：积分排行榜卡片 -->
     <el-card class="ranking-card">
       <template v-slot:header>
@@ -432,6 +496,9 @@ onMounted(() => {
   initChart()
   loadTaskProgress()
   checkTaskReset() // 检查任务是否需要周重置
+  window.addEventListener('storage', () => {
+    userSelfPoints.value = parseInt(localStorage.getItem('userTotalPoints') || '0')
+  })
 })
 
 // 加载好友数据
@@ -821,6 +888,7 @@ const handleAddFriend = async () => {
       friends.value.push(newFriend)
       saveFriendsToLocalStorage()
       ElMessage.success('好友添加成功！获得20积分奖励~')
+      addUserPoints(20)
       showAddFriendModal.value = false
       newFriendForm.name = ''
       newFriendForm.tags = ''
@@ -855,6 +923,7 @@ const commonCheckin = (friendId) => {
   // 保存数据
   saveFriendsToLocalStorage()
   ElMessage.success(`与${friend.name}共同打卡成功，获得15积分！`)
+  addUserPoints(15)
 }
 
 // 新增：获取当前用户自己的积分
@@ -895,6 +964,100 @@ const getRankingClass = (index, isSelf) => {
   if (index === 1) return `${baseClass} ranking-second`
   if (index === 2) return `${baseClass} ranking-third`
   return `${baseClass} ranking-other`
+}
+
+// 已拥有的奖励
+const ownedRewards = ref(JSON.parse(localStorage.getItem('ownedRewards') || '[]'))
+
+// 可兑换的奖励列表
+const availableRewards = ref([
+  {
+    id: 'effect1',
+    name: '气泡特效',
+    icon: '💬',
+    desc: '发送消息时使用彩色气泡背景',
+    cost: 100,
+    type: '聊天特效',
+    preview: '消息框将显示渐变彩色背景',
+  },
+  {
+    id: 'effect2',
+    name: '动画特效',
+    icon: '✨',
+    desc: '消息发送时带有入场动画',
+    cost: 150,
+    type: '聊天特效',
+    preview: '消息出现时将有平滑的动画效果',
+  },
+  {
+    id: 'badge1',
+    name: '聊天气泡',
+    icon: '🏅',
+    desc: '个人资料中显示专属勋章',
+    cost: 200,
+    type: '虚拟勋章',
+    preview: '个人资料页将展示"聊天气泡"勋章',
+  },
+  {
+    id: 'badge2',
+    name: '社交达人',
+    icon: '🌟',
+    desc: '个人资料中显示高级勋章',
+    cost: 300,
+    type: '虚拟勋章',
+    preview: '个人资料页将展示"社交达人"勋章',
+  },
+])
+
+// 兑换相关状态
+const showRewardCenter = ref(false)
+const currentReward = ref(null)
+
+// 检查是否已拥有奖励
+const hasOwnedReward = (rewardId) => {
+  return ownedRewards.value.includes(rewardId)
+}
+
+// 打开兑换确认
+const openExchangeConfirm = (reward) => {
+  if (userSelfPoints.value < reward.cost) {
+    ElMessage.warning('积分不足，无法兑换')
+    return
+  }
+
+  currentReward.value = reward
+  ElMessageBox.confirm(
+    `确定要花费 ${reward.cost} 积分兑换「${reward.name}」吗？\n${reward.preview}`,
+    '兑换确认',
+    {
+      confirmButtonText: '确认兑换',
+      cancelButtonText: '取消',
+      type: 'info',
+    },
+  )
+    .then(() => {
+      completeExchange(reward)
+    })
+    .catch(() => {
+      currentReward.value = null
+    })
+}
+
+// 完成兑换
+const completeExchange = (reward) => {
+  if (!reward) return
+
+  // 扣除积分
+  const newPoints = userSelfPoints.value - reward.cost
+  userSelfPoints.value = newPoints
+  localStorage.setItem('userTotalPoints', newPoints.toString())
+
+  // 标记为已拥有
+  ownedRewards.value.push(reward.id)
+  localStorage.setItem('ownedRewards', JSON.stringify(ownedRewards.value))
+
+  ElMessage.success(`成功兑换「${reward.name}」！`)
+  currentReward.value = null
 }
 </script>
 <style scoped>
@@ -1760,5 +1923,145 @@ const getRankingClass = (index, isSelf) => {
   font-size: 14px;
   background-color: #f8f9fa;
   border-radius: 8px;
+}
+
+/* 积分兑换按钮 */
+::v-deep .reward-center-btn {
+  background-color: #faad14 !important;
+  color: #fff !important;
+  margin-left: 10px !important;
+}
+
+/* 奖励中心弹窗样式 */
+.reward-center-modal .el-dialog__body {
+  padding: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.reward-center-header {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.user-points {
+  font-size: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.points-value {
+  color: #faad14;
+}
+
+.reward-tips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
+  background-color: #fffbe6;
+  padding: 6px 12px;
+  border-radius: 4px;
+}
+
+/* 奖励网格布局 */
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+/* 奖励卡片样式 */
+.reward-card {
+  transition: transform 0.2s;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.reward-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.reward-card.owned {
+  opacity: 0.7;
+}
+
+.reward-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.reward-icon-large {
+  font-size: 32px;
+  text-align: center;
+}
+
+.reward-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reward-name {
+  margin: 0;
+  font-size: 16px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.reward-desc {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.reward-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.reward-cost {
+  color: #faad14;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reward-type {
+  color: #666;
+  background-color: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+/* 聊天特效样式 */
+.effect-bubble .chat-content {
+  background: linear-gradient(135deg, #409eff, #722ed1);
+  color: white;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.effect-animation .chat-content {
+  animation: floatIn 0.5s ease-out;
+}
+
+@keyframes floatIn {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>
