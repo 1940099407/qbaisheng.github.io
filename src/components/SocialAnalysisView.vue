@@ -3,12 +3,17 @@
     <div class="page-header">
       <h2>互动交流</h2>
       <!-- 积分兑换中心按钮 -->
-      <el-button type="primary" icon="Gift" @click="showRewardCenter = true" class="add-friend-btn">
+      <el-button
+        type="primary"
+        icons="Gift"
+        @click="showRewardCenter = true"
+        class="add-friend-btn"
+      >
         积分兑换
       </el-button>
       <el-button
         type="primary"
-        icon="Plus"
+        icons="Plus"
         @click="showAddFriendModal = true"
         class="add-friend-btn"
       >
