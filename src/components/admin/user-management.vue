@@ -66,8 +66,16 @@
         <el-table-column prop="joinDate" label="注册时间" width="120" />
         <el-table-column prop="totalCheckins" label="总打卡次数" width="120" align="center" />
         <!-- 积分列与个人页面同步（共用totalPoints字段） -->
-        <el-table-column prop="totalPoints" label="总积分" width="120" align="center" />
-        <el-table-column prop="lastActive" label="最后活跃" width="130" />
+        <el-table-column label="总积分" width="120" align="center">
+          <template #default="scope">
+            {{ scope.row.totalPoints ?? 0 }}
+          </template>
+        </el-table-column>
+        <el-table-column label="最后活跃" width="130">
+          <template #default="scope">
+            {{ scope.row.lastActive ?? '未活跃' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="380" align="center">
           <template #default="scope">
             <el-button size="small" type="primary" icons="Eye" @click="openUserDetail(scope.row)"
@@ -147,6 +155,15 @@
             <el-option label="启用" value="active" />
             <el-option label="禁用" value="inactive" />
           </el-select>
+        </el-form-item>
+        <!-- 编辑用户弹窗的表单中（template中） -->
+        <el-form-item label="总积分" prop="totalPoints">
+          <el-input
+            v-model.number="userForm.totalPoints"
+            type="number"
+            min="0"
+            placeholder="请输入总积分（非负整数）"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -314,6 +331,7 @@ const userForm = reactive({
   password: '',
   role: 'user',
   status: 'active',
+  totalPoints: 0, // 新增：总积分字段
 })
 
 const userFormRules = {
@@ -327,6 +345,21 @@ const userFormRules = {
   ],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }],
   status: [{ required: true, message: '请选择状态', trigger: 'change' }],
+  totalPoints: [
+    { required: true, message: '请输入总积分', trigger: 'blur' },
+    { type: 'number', message: '积分必须是数字', trigger: 'blur' },
+    // 修正逻辑：只有value < 0时才提示“不能为负数”
+    {
+      validator: (rule, value, callback) => {
+        if (value < 0) {
+          callback(new Error('积分不能为负数'))
+        } else {
+          callback() // 正数/0都通过
+        }
+      },
+      trigger: ['blur', 'change'],
+    },
+  ],
 }
 
 // 加载用户数据（确保积分数据与个人页面同步）
@@ -544,6 +577,9 @@ const openEditUserDialog = (user) => {
   userForm.role = user.role
   userForm.status = user.status
   showUserDialog.value = true
+  // 新增：加载总积分，空值默认0
+  userForm.totalPoints = user.totalPoints ?? 0
+  showUserDialog.value = true
 }
 
 // 提交用户表单
@@ -558,9 +594,13 @@ const submitUserForm = () => {
             role: userForm.role,
             status: userForm.status,
             ...(userForm.password && { password: userForm.password }),
+            // 保留原有注册时间，确保积分被覆盖更新
+            totalPoints: userForm.totalPoints, // 新增：同步总积分的修改
+            joinDate: users.value[index].joinDate, // 保留注册时间
           }
           localStorage.setItem('systemUsers', JSON.stringify(users.value))
           ElMessage.success('用户编辑成功')
+          ElMessage.success('用户编辑成功（含积分更新）')
         }
       } else {
         const exists = users.value.some((u) => u.username === userForm.username)
