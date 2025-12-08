@@ -9,9 +9,9 @@
           :rules="[{ required: true, message: '请选择申请类型' }]"
         >
           <el-select v-model="form.type" placeholder="请选择">
-            <el-option label="请假" value="leave"></el-option>
-            <el-option label="报销" value="reimbursement"></el-option>
-            <el-option label="其他" value="other"></el-option>
+            <el-option label="运动打卡豁免" value="leave"></el-option>
+            <el-option label="学习打卡豁免" value="reimbursement"></el-option>
+            <el-option label="其他打卡豁免" value="other"></el-option>
           </el-select>
         </el-form-item>
 
