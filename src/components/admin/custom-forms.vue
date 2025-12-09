@@ -210,7 +210,7 @@
       </template>
     </el-dialog>
 
-    <!-- 表单预览弹窗 -->
+    <!-- 表单预览弹窗（修复后） -->
     <el-dialog title="表单预览" v-model="showPreviewDialog" width="600px">
       <div class="preview-container">
         <h3 style="text-align: center; margin-bottom: 20px">{{ previewTemplateData.name }}</h3>
@@ -221,10 +221,70 @@
             :label="field.label"
             :required="field.required"
           >
-            <component
-              :is="getPreviewComponent(field.type)"
+            <!-- 文本类型 -->
+            <el-input
+              v-if="field.type === 'text'"
               v-model="previewFormData[`field_${index}`]"
-              :field="field"
+              :placeholder="field.placeholder"
+              :maxlength="field.maxLength || undefined"
+            />
+
+            <!-- 数字类型 -->
+            <el-input
+              v-else-if="field.type === 'number'"
+              v-model.number="previewFormData[`field_${index}`]"
+              type="number"
+              :placeholder="field.placeholder"
+              :min="field.min"
+              :max="field.max"
+            />
+
+            <!-- 单选类型 -->
+            <el-radio-group
+              v-else-if="field.type === 'radio'"
+              v-model="previewFormData[`field_${index}`]"
+            >
+              <el-radio
+                v-for="(opt, optIdx) in field.options"
+                :key="optIdx"
+                :label="opt"
+                style="margin-right: 15px"
+              >
+                {{ opt }}
+              </el-radio>
+            </el-radio-group>
+
+            <!-- 多选类型 -->
+            <el-checkbox-group
+              v-else-if="field.type === 'checkbox'"
+              v-model="previewFormData[`field_${index}`]"
+            >
+              <el-checkbox
+                v-for="(opt, optIdx) in field.options"
+                :key="optIdx"
+                :label="opt"
+                style="margin-right: 15px"
+              >
+                {{ opt }}
+              </el-checkbox>
+            </el-checkbox-group>
+
+            <!-- 日期类型 -->
+            <el-date-picker
+              v-else-if="field.type === 'date'"
+              v-model="previewFormData[`field_${index}`]"
+              type="date"
+              :placeholder="field.placeholder"
+            />
+
+            <!-- 多行文本类型 -->
+            <el-input
+              v-else-if="field.type === 'textarea'"
+              v-model="previewFormData[`field_${index}`]"
+              type="textarea"
+              :placeholder="field.placeholder"
+              :maxlength="field.maxLength || undefined"
+              rows="3"
             />
           </el-form-item>
         </el-form>
@@ -235,31 +295,10 @@
     </el-dialog>
   </div>
 </template>
-
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
-
-// 预览组件映射
-const getPreviewComponent = (type) => {
-  switch (type) {
-    case 'text':
-      return 'el-input'
-    case 'number':
-      return 'el-input-number'
-    case 'radio':
-      return 'el-radio-group'
-    case 'checkbox':
-      return 'el-checkbox-group'
-    case 'date':
-      return 'el-date-picker'
-    case 'textarea':
-      return 'el-input'
-    default:
-      return 'el-input'
-  }
-}
+import { Plus } from '@element-plus/icons-vue' // 补充导入Delete图标
 
 // 分类数据
 const categories = ref([
@@ -449,13 +488,22 @@ const copyTemplate = (template) => {
   ElMessage.success('模板复制成功')
 }
 
-// 预览模板
+// 预览模板（修复后）
 const previewTemplate = (template) => {
   previewTemplateData.value = JSON.parse(JSON.stringify(template))
-  // 初始化预览表单数据
+  // 初始化预览表单数据（适配不同字段类型）
   const previewData = {}
-  template.fields.forEach((_, index) => {
-    previewData[`field_${index}`] = _.type === 'checkbox' ? [] : _.type === 'date' ? null : ''
+  template.fields.forEach((field, index) => {
+    const key = `field_${index}`
+    if (field.type === 'checkbox') {
+      previewData[key] = [] // 多选初始化为空数组
+    } else if (field.type === 'date') {
+      previewData[key] = null // 日期初始化为null
+    } else if (field.type === 'radio' && field.options.length > 0) {
+      previewData[key] = field.options[0] // 单选默认选第一个选项
+    } else {
+      previewData[key] = '' // 其他类型初始化为空字符串
+    }
   })
   previewFormData.value = previewData
   showPreviewDialog.value = true
@@ -532,25 +580,22 @@ const resetForm = () => {
   activeFieldIndex.value = -1
   newOptionText.value = ''
 }
-// 在setup顶部声明防抖计时器
+
+// 搜索防抖计时器
 let timer = null
+
 // 搜索处理
 const handleSearch = (val) => {
-  // 使用参数val更新搜索关键词（消除“未使用参数”提示）
-  searchKeyword.value = val
-
-  // 搜索防抖（避免频繁触发搜索）
+  searchKeyword.value = val // 使用参数val更新搜索关键词
+  // 搜索防抖
   clearTimeout(timer)
   timer = setTimeout(() => {
-    // 若后续需对接后端搜索接口，可在此处写请求逻辑
-    // 示例：fetchTemplatesByKeyword(searchKeyword.value)
+    // 后续可添加后端搜索接口逻辑
   }, 300)
 }
 
-// 筛选模板
-const filterTemplates = () => {
-  // 筛选逻辑由computed自动处理
-}
+// 筛选模板（computed自动处理）
+const filterTemplates = () => {}
 
 // 格式化分类显示
 const formatCategory = (row) => {
@@ -558,7 +603,6 @@ const formatCategory = (row) => {
   return category ? category.name : '未分类'
 }
 </script>
-
 <style scoped>
 .custom-forms-page {
   padding: 20px;
