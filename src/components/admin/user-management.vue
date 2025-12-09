@@ -63,20 +63,20 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="joinDate" label="注册时间" width="120" />
-        <el-table-column prop="totalCheckins" label="总打卡次数" width="120" align="center" />
+        <el-table-column prop="joinDate" label="注册时间" width="100" />
+        <el-table-column prop="totalCheckins" label="总打卡次数" width="100" align="center" />
         <!-- 积分列与个人页面同步（共用totalPoints字段） -->
-        <el-table-column label="总积分" width="120" align="center">
+        <el-table-column label="总积分" width="80" align="center">
           <template #default="scope">
             {{ scope.row.totalPoints ?? 0 }}
           </template>
         </el-table-column>
-        <el-table-column label="最后活跃" width="130">
+        <el-table-column label="最后活跃" width="90">
           <template #default="scope">
             {{ scope.row.lastActive ?? '未活跃' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="380" align="center">
+        <el-table-column label="操作" width="350" align="center">
           <template #default="scope">
             <el-button size="small" type="primary" icons="Eye" @click="openUserDetail(scope.row)"
               >查看详情</el-button

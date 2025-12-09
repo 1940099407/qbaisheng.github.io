@@ -18,6 +18,7 @@ import UserManagement from '../components/admin/user-management.vue'
 import CheckinReview from '../components/admin/checkin-review.vue'
 import ActivityPublish from '../components/admin/activity-publish.vue'
 import TemplateManager from '../components/checkin-template-manager.vue'
+
 // Element Plus 组件
 import { ElMessage } from 'element-plus'
 import { createApp } from 'vue'
@@ -85,6 +86,15 @@ const routes = [
       {
         path: 'approval-management',
         component: () => import('../components/admin/ApprovalManagement.vue'),
+      }, // 在管理员路由的children数组中添加
+      {
+        path: 'data-statistics',
+        component: () => import('../components/admin/data-statistics.vue'),
+      },
+      { path: 'custom-forms', component: () => import('../components/admin/custom-forms.vue') },
+      {
+        path: 'system-settings',
+        component: () => import('../components/admin/system-settings.vue'),
       },
     ],
   },

@@ -43,6 +43,31 @@
           <i class="icon">📢</i>
           <span class="nav-text" v-if="!isCollapsed">活动管理</span>
         </router-link>
+        <!-- 在nav-menu中添加 -->
+        <router-link
+          to="/admin/data-statistics"
+          class="nav-item"
+          :class="{ active: $route.path === '/admin/data-statistics' }"
+        >
+          <i class="icon">📊</i>
+          <span class="nav-text" v-if="!isCollapsed">数据统计</span>
+        </router-link>
+        <router-link
+          to="/admin/custom-forms"
+          class="nav-item"
+          :class="{ active: $route.path === '/admin/custom-forms' }"
+        >
+          <i class="icon">📝</i>
+          <span class="nav-text" v-if="!isCollapsed">表单模板</span>
+        </router-link>
+        <router-link
+          to="/admin/system-settings"
+          class="nav-item"
+          :class="{ active: $route.path === '/admin/system-settings' }"
+        >
+          <i class="icon">⚙️</i>
+          <span class="nav-text" v-if="!isCollapsed">系统配置</span>
+        </router-link>
       </nav>
 
       <!-- 退出登录按钮（复用样式） -->
