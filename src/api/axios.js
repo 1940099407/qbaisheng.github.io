@@ -1,29 +1,31 @@
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
-// 创建axios实例
 const service = axios.create({
-  baseURL: 'http://localhost:8081/api', // 后端接口基础地址，后续替换为你的实际地址
-  timeout: 5000, // 请求超时时间
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  // 核心修改：写后端完整地址（含context-path），绝对路径
+  baseURL: 'http://localhost:8080/api',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json;charset=utf-8',
+  },
 })
 
-// 请求拦截器：添加用户ID到请求头（身份验证用）
+// 保留原有拦截器（无需改）
 service.interceptors.request.use(
-  (config) => {
-    const userId = localStorage.getItem('userId')
-    if (userId) {
-      config.headers.userId = userId
-    }
-    return config
-  },
+  (config) => config,
   (error) => Promise.reject(error),
 )
-
-// 响应拦截器：统一处理结果
 service.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const res = response.data
+    if (!res.success) {
+      ElMessage.error(res.msg || '登录失败')
+      return Promise.reject(res)
+    }
+    return res
+  },
   (error) => {
-    alert('接口请求失败，请重试！')
+    ElMessage.error(error.message || '后端服务未启动')
     return Promise.reject(error)
   },
 )

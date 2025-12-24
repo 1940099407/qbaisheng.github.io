@@ -4,11 +4,21 @@
       <h2>打卡系统</h2>
       <div class="form-item">
         <label>用户名</label>
-        <input type="text" v-model="username" placeholder="请输入用户名" @keyup.enter="login" />
+        <input
+          type="text"
+          v-model="username"
+          placeholder="请输入用户名"
+          @keyup.enter="handleLogin"
+        />
       </div>
       <div class="form-item">
         <label>密码</label>
-        <input type="password" v-model="password" placeholder="请输入密码" @keyup.enter="login" />
+        <input
+          type="password"
+          v-model="password"
+          placeholder="请输入密码"
+          @keyup.enter="handleLogin"
+        />
       </div>
       <div class="form-item">
         <label>角色</label>
@@ -17,14 +27,13 @@
           <option value="admin">管理员</option>
         </select>
       </div>
-      <button @click="login" class="login-btn">登录</button>
+      <button @click="handleLogin" class="login-btn">登录</button>
       <div class="register-link">还没有账号？<a href="/register">立即注册</a></div>
-      <!-- 新增忘记密码功能 -->
       <div class="forgot-password">
         <a href="#" @click.prevent="showForgotModal = true">忘记密码？</a>
       </div>
 
-      <!-- 忘记密码弹窗（修改为原生表单，统一样式） -->
+      <!-- 忘记密码弹窗 -->
       <div class="custom-modal" v-if="showForgotModal">
         <div class="modal-overlay" @click="showForgotModal = false"></div>
         <div class="modal-content">
@@ -32,7 +41,7 @@
             <h3>找回密码</h3>
             <button class="close-btn" @click="showForgotModal = false">&times;</button>
           </div>
-          <form class="forgot-form" @submit.prevent="resetPassword">
+          <form class="forgot-form" @submit.prevent="handleResetPassword">
             <div class="form-item">
               <label>用户名</label>
               <input
@@ -69,88 +78,76 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+// 核心修复：导入名称与user.js导出完全一致，别名避免冲突
+import { login as apiLogin, resetPassword as apiResetPassword } from '@/api/user'
 
 const router = useRouter()
 const username = ref('')
 const password = ref('')
-const selectedRole = ref('user') // 默认普通用户
+const selectedRole = ref('user')
 
-// 检查localStorage是否可用
+// 忘记密码相关
+const showForgotModal = ref(false)
+const forgotData = ref({ username: '', newPassword: '' })
+
+// 检查localStorage是否可用（修复ESLint no-unused-vars报错）
 const isLocalStorageAvailable = () => {
   try {
     const testKey = 'test_local_storage'
     localStorage.setItem(testKey, testKey)
     localStorage.removeItem(testKey)
     return true
-    // eslint-disable-next-line no-unused-vars
-  } catch (_) {
+  } catch {
+    // 省略未使用的catch变量，解决ESLint报错
     return false
   }
 }
 
-const login = () => {
-  // 1. 基础校验
+// 登录逻辑（对接后端接口）
+const handleLogin = async () => {
+  // 基础校验
   if (!username.value.trim() || !password.value.trim()) {
-    // 增加trim()，避免空格绕过校验
     ElMessage.warning('用户名和密码不能为空')
     return
   }
 
-  // 2. 检查localStorage可用性
+  // 检查localStorage可用性
   if (!isLocalStorageAvailable()) {
     ElMessage.error('浏览器存储功能不可用，请关闭隐私模式或更换浏览器')
     return
   }
 
-  // 3. 清除旧登录信息
-  localStorage.removeItem('isLoggedIn')
-  localStorage.removeItem('username')
-  localStorage.removeItem('userRole')
+  try {
+    // 调用后端登录接口
+    const res = await apiLogin({
+      username: username.value.trim(),
+      password: password.value.trim(),
+      role: selectedRole.value,
+    })
 
-  // 4. 登录验证逻辑（模拟后端校验）
-  let userRole = 'user'
-  let isSuccess = false
+    // 存储后端返回的Token和用户信息
+    localStorage.setItem('token', res.token)
+    localStorage.setItem('username', res.username)
+    localStorage.setItem('userRole', res.role)
 
-  // 管理员验证：仅admin/admin123可登录管理员角色
-  if (selectedRole.value === 'admin') {
-    // 只有选择了管理员角色，才验证管理员账号
-    if (username.value === 'admin' && password.value === 'admin123') {
-      userRole = 'admin'
-      isSuccess = true
-    } else {
-      ElMessage.error('管理员账号或密码错误（admin/admin123）')
-      return // 提前返回，避免继续执行
-    }
-  } else {
-    // 普通用户验证：非空即可（实际项目替换为接口校验）
-    isSuccess = true
-  }
-
-  // 5. 登录成功处理
-  if (isSuccess) {
-    // 存储登录状态（显式转为字符串，避免localStorage自动转换问题）
-    localStorage.setItem('isLoggedIn', 'true')
-    localStorage.setItem('username', username.value.trim())
-    localStorage.setItem('userRole', userRole)
-
-    // 二次验证存储结果（防止极端情况下存储失败）
-    if (localStorage.getItem('userRole') !== userRole) {
+    // 二次验证存储结果
+    if (localStorage.getItem('userRole') !== res.role) {
       ElMessage.error('登录信息存储失败，请重试')
       return
     }
 
-    // 6. 跳转对应首页（使用replace清除登录页历史）
-    const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
+    // 跳转对应页面
+    const homePath = res.role === 'admin' ? '/admin/user-management' : '/checkin'
     router.replace(homePath)
-    ElMessage.success(`${userRole === 'admin' ? '管理员' : '用户'}登录成功`)
+    ElMessage.success(`${res.role === 'admin' ? '管理员' : '用户'}登录成功`)
+  } catch (error) {
+    ElMessage.error(error.msg || '登录失败，请检查账号密码')
+    console.error('登录接口异常：', error)
   }
 }
 
-// 新增忘记密码相关逻辑
-const showForgotModal = ref(false)
-const forgotData = ref({ username: '', newPassword: '' })
-
-const resetPassword = () => {
+// 重置密码逻辑（对接后端接口）
+const handleResetPassword = async () => {
   // 前端校验
   if (!forgotData.value.username.trim()) {
     ElMessage.warning('请输入用户名')
@@ -161,18 +158,19 @@ const resetPassword = () => {
     return
   }
 
-  const users = JSON.parse(localStorage.getItem('systemUsers') || '[]')
-  const userIndex = users.findIndex((u) => u.username === forgotData.value.username.trim())
+  try {
+    // 调用后端重置密码接口
+    await apiResetPassword({
+      username: forgotData.value.username.trim(),
+      newPassword: forgotData.value.newPassword,
+    })
 
-  if (userIndex > -1) {
-    users[userIndex].password = forgotData.value.newPassword
-    localStorage.setItem('systemUsers', JSON.stringify(users))
-    ElMessage.success('密码重置成功')
+    ElMessage.success('密码重置成功，请使用新密码登录')
     showForgotModal.value = false
-    // 重置表单
     forgotData.value = { username: '', newPassword: '' }
-  } else {
-    ElMessage.error('用户名不存在')
+  } catch (error) {
+    ElMessage.error(error.msg || '密码重置失败，用户名不存在')
+    console.error('重置密码接口异常：', error)
   }
 }
 </script>
@@ -214,20 +212,18 @@ const resetPassword = () => {
 
 .form-item input,
 .role-select {
-  /* 统一输入框和选择框样式 */
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
-  transition: border-color 0.2s; /* 焦点动画 */
+  transition: border-color 0.2s;
 }
 
-/* 焦点样式：提升交互体验 */
 .form-item input:focus,
 .role-select:focus {
   outline: none;
-  border-color: #409eff; /* 与登录按钮颜色呼应 */
+  border-color: #409eff;
 }
 
 .login-btn {
@@ -262,7 +258,6 @@ const resetPassword = () => {
   text-decoration: underline;
 }
 
-/* 忘记密码链接样式 */
 .forgot-password {
   text-align: center;
   margin-top: 10px;
@@ -279,7 +274,6 @@ const resetPassword = () => {
   text-decoration: underline;
 }
 
-/* 自定义忘记密码弹窗样式（与登录页统一） */
 .custom-modal {
   position: fixed;
   top: 0;

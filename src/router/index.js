@@ -21,19 +21,19 @@ import TemplateManager from '../components/checkin-template-manager.vue'
 
 // Element Plus 组件
 import { ElMessage } from 'element-plus'
-import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import App from '../App.vue'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+// import { createApp } from 'vue'
+// import ElementPlus from 'element-plus'
+// import App from '../App.vue'
+// import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 
-const app = createApp(App)
-// 全局注册所有图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
+// const app = createApp(App)
+// // 全局注册所有图标
+// for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+//   app.component(key, component)
+// }
 
-app.use(ElementPlus).mount('#app')
+// app.use(ElementPlus).mount('#app')
 
 const routes = [
   { path: '/', redirect: '/login' },
