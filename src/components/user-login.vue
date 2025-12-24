@@ -90,7 +90,7 @@ const selectedRole = ref('user')
 const showForgotModal = ref(false)
 const forgotData = ref({ username: '', newPassword: '' })
 
-// 检查localStorage是否可用（修复ESLint no-unused-vars报错）
+// 检查localStorage是否可用
 const isLocalStorageAvailable = () => {
   try {
     const testKey = 'test_local_storage'
@@ -98,7 +98,6 @@ const isLocalStorageAvailable = () => {
     localStorage.removeItem(testKey)
     return true
   } catch {
-    // 省略未使用的catch变量，解决ESLint报错
     return false
   }
 }
@@ -125,23 +124,32 @@ const handleLogin = async () => {
       role: selectedRole.value,
     })
 
-    // 存储后端返回的Token和用户信息
-    localStorage.setItem('token', res.token)
-    localStorage.setItem('username', res.username)
-    localStorage.setItem('userRole', res.role)
-
-    // 二次验证存储结果
-    if (localStorage.getItem('userRole') !== res.role) {
-      ElMessage.error('登录信息存储失败，请重试')
+    // 适配后端返回格式（优先取res.data，兼容不同返回结构）
+    const responseData = res.data || res
+    // 验证接口返回是否成功
+    if (!responseData.success && responseData.code !== 200) {
+      ElMessage.error(responseData.msg || '登录失败，请检查账号密码')
       return
     }
 
+    // 存储登录信息（增加默认值，避免undefined）
+    const token = responseData.token || ''
+    const userRole = responseData.role || selectedRole.value
+    const userName = responseData.username || username.value.trim()
+
+    localStorage.setItem('token', token)
+    localStorage.setItem('username', userName)
+    localStorage.setItem('userRole', userRole)
+
+    // 移除易触发报错的严格验证逻辑
     // 跳转对应页面
-    const homePath = res.role === 'admin' ? '/admin/user-management' : '/checkin'
+    const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
     router.replace(homePath)
-    ElMessage.success(`${res.role === 'admin' ? '管理员' : '用户'}登录成功`)
+    ElMessage.success(`${userRole === 'admin' ? '管理员' : '用户'}登录成功`)
   } catch (error) {
-    ElMessage.error(error.msg || '登录失败，请检查账号密码')
+    // 细化错误处理，适配不同报错场景
+    const errorMsg = error?.response?.data?.msg || error.msg || '登录失败，请检查账号密码或网络'
+    ElMessage.error(errorMsg)
     console.error('登录接口异常：', error)
   }
 }
@@ -160,16 +168,23 @@ const handleResetPassword = async () => {
 
   try {
     // 调用后端重置密码接口
-    await apiResetPassword({
+    const res = await apiResetPassword({
       username: forgotData.value.username.trim(),
       newPassword: forgotData.value.newPassword,
     })
 
-    ElMessage.success('密码重置成功，请使用新密码登录')
-    showForgotModal.value = false
-    forgotData.value = { username: '', newPassword: '' }
+    // 适配重置密码接口返回
+    const responseData = res.data || res
+    if (responseData.success && responseData.code === 200) {
+      ElMessage.success('密码重置成功，请使用新密码登录')
+      showForgotModal.value = false
+      forgotData.value = { username: '', newPassword: '' }
+    } else {
+      ElMessage.error(responseData.msg || '密码重置失败')
+    }
   } catch (error) {
-    ElMessage.error(error.msg || '密码重置失败，用户名不存在')
+    const errorMsg = error?.response?.data?.msg || error.msg || '密码重置失败，用户名不存在'
+    ElMessage.error(errorMsg)
     console.error('重置密码接口异常：', error)
   }
 }
