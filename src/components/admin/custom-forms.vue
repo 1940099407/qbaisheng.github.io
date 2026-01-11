@@ -604,6 +604,11 @@ const formatCategory = (row) => {
 }
 </script>
 <style scoped>
+h2 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-weight: 600;
+}
 .custom-forms-page {
   padding: 20px;
   background-color: #f5f7fa;

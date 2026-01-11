@@ -8,7 +8,7 @@ import Record from '../components/checkin-record.vue'
 import Profile from '../components/user-profile.vue'
 import Statistics from '../components/checkin-statistics.vue'
 import ReminderSetting from '../components/reminder-setting.vue'
-import ActivitiesView from '../components/ActivitiesView.vue' // 新增导入
+import ActivitiesView from '../components/ActivitiesView.vue'
 import SocialAnalysisView from '../components/SocialAnalysisView.vue'
 
 import Register from '../components/user-register.vue'
@@ -21,19 +21,7 @@ import TemplateManager from '../components/checkin-template-manager.vue'
 
 // Element Plus 组件
 import { ElMessage } from 'element-plus'
-// import { createApp } from 'vue'
-// import ElementPlus from 'element-plus'
-// import App from '../App.vue'
-// import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
-
-// const app = createApp(App)
-// // 全局注册所有图标
-// for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-//   app.component(key, component)
-// }
-
-// app.use(ElementPlus).mount('#app')
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -53,9 +41,9 @@ const routes = [
       { path: 'record', component: Record },
       { path: 'profile', component: Profile },
       { path: 'statistics', component: Statistics },
-      { path: 'reminder', component: ReminderSetting }, // 新增提醒设置路由
-      { path: 'activities', component: ActivitiesView }, // 活动参加页面
-      { path: 'social', component: SocialAnalysisView }, // 社交分享页面
+      { path: 'reminder', component: ReminderSetting },
+      { path: 'activities', component: ActivitiesView },
+      { path: 'social', component: SocialAnalysisView },
       {
         path: 'health-assessment',
         component: HealthAssessment,
@@ -82,11 +70,11 @@ const routes = [
       { path: 'user-management', component: UserManagement },
       { path: 'checkin-review', component: CheckinReview },
       { path: 'activity-publish', component: ActivityPublish },
-      { path: 'template-manager', component: TemplateManager }, // 模板管理路由
+      { path: 'template-manager', component: TemplateManager },
       {
         path: 'approval-management',
         component: () => import('../components/admin/ApprovalManagement.vue'),
-      }, // 在管理员路由的children数组中添加
+      },
       {
         path: 'data-statistics',
         component: () => import('../components/admin/data-statistics.vue'),
@@ -108,35 +96,49 @@ const router = createRouter({
   routes,
 })
 
-// 导航守卫：验证登录状态和角色权限
+// 导航守卫：修复重复提示问题，简化权限校验
 router.beforeEach((to, from, next) => {
-  // 从localStorage获取登录状态和角色（与登录组件存储逻辑保持一致）
+  // 从localStorage获取登录状态和角色
   const isLogin = localStorage.getItem('username') !== null
-  const userRole = localStorage.getItem('userRole') || 'user' // 默认用户角色
+  const userRole = localStorage.getItem('userRole') || 'user'
 
   if (to.meta.requiresAuth) {
     // 需要登录的页面
     if (!isLogin) {
-      // 未登录：跳转到登录页
-      ElMessage.warning('请先登录')
+      // 未登录：跳登录页（仅提示一次）
+      if (from.path !== '/login') {
+        ElMessage.warning('请先登录')
+      }
       next('/login')
-    } else if (to.meta.role && to.meta.role !== userRole) {
-      // 角色不匹配（如用户访问管理员页面）
-      ElMessage.error('没有权限访问该页面')
-      // 跳转到对应角色的首页
-      const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
-      next(homePath)
     } else {
-      // 验证通过
-      next()
+      // 已登录：仅校验角色，且避免循环提示
+      if (to.meta.role && to.meta.role !== userRole) {
+        // 角色不匹配：仅提示一次，且只在“目标页≠当前页”时跳转
+        if (to.path !== from.path) {
+          ElMessage.error('没有权限访问该页面')
+          const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
+          // 仅当跳转的首页不是当前页时才执行跳转
+          if (homePath !== to.path) {
+            next(homePath)
+          } else {
+            next(false) // 阻止重复跳转
+          }
+        } else {
+          next(false)
+        }
+      } else {
+        // 角色匹配：正常放行
+        next()
+      }
     }
   } else {
-    // 不需要登录的页面（登录页）
-    if (isLogin && to.path !== '/register') {
-      // 允许已登录用户访问注册页
+    // 不需要登录的页面（登录/注册页）
+    if (isLogin && to.path === '/login' && from.path !== '/') {
+      // 已登录用户访问登录页：跳对应首页（仅跳转一次）
       const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
       next(homePath)
     } else {
+      // 未登录/访问注册页：正常放行
       next()
     }
   }

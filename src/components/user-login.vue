@@ -78,8 +78,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-// 核心修复：导入名称与user.js导出完全一致，别名避免冲突
-import { login as apiLogin, resetPassword as apiResetPassword } from '@/api/user'
 
 const router = useRouter()
 const username = ref('')
@@ -90,73 +88,28 @@ const selectedRole = ref('user')
 const showForgotModal = ref(false)
 const forgotData = ref({ username: '', newPassword: '' })
 
-// 检查localStorage是否可用
-const isLocalStorageAvailable = () => {
-  try {
-    const testKey = 'test_local_storage'
-    localStorage.setItem(testKey, testKey)
-    localStorage.removeItem(testKey)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// 登录逻辑（对接后端接口）
-const handleLogin = async () => {
+// 登录逻辑（无后端，仅标记登录态）
+const handleLogin = () => {
   // 基础校验
   if (!username.value.trim() || !password.value.trim()) {
     ElMessage.warning('用户名和密码不能为空')
     return
   }
 
-  // 检查localStorage可用性
-  if (!isLocalStorageAvailable()) {
-    ElMessage.error('浏览器存储功能不可用，请关闭隐私模式或更换浏览器')
-    return
-  }
+  // 强制标记已登录（跳过权限校验核心）
+  localStorage.setItem('isLoggedIn', 'true')
+  // 存储角色（仅为了页面展示，无权限校验作用）
+  localStorage.setItem('userRole', selectedRole.value)
+  localStorage.setItem('username', username.value.trim())
 
-  try {
-    // 调用后端登录接口
-    const res = await apiLogin({
-      username: username.value.trim(),
-      password: password.value.trim(),
-      role: selectedRole.value,
-    })
-
-    // 适配后端返回格式（优先取res.data，兼容不同返回结构）
-    const responseData = res.data || res
-    // 验证接口返回是否成功
-    if (!responseData.success && responseData.code !== 200) {
-      ElMessage.error(responseData.msg || '登录失败，请检查账号密码')
-      return
-    }
-
-    // 存储登录信息（增加默认值，避免undefined）
-    const token = responseData.token || ''
-    const userRole = responseData.role || selectedRole.value
-    const userName = responseData.username || username.value.trim()
-
-    localStorage.setItem('token', token)
-    localStorage.setItem('username', userName)
-    localStorage.setItem('userRole', userRole)
-
-    // 移除易触发报错的严格验证逻辑
-    // 跳转对应页面
-    const homePath = userRole === 'admin' ? '/admin/user-management' : '/checkin'
-    router.replace(homePath)
-    ElMessage.success(`${userRole === 'admin' ? '管理员' : '用户'}登录成功`)
-  } catch (error) {
-    // 细化错误处理，适配不同报错场景
-    const errorMsg = error?.response?.data?.msg || error.msg || '登录失败，请检查账号密码或网络'
-    ElMessage.error(errorMsg)
-    console.error('登录接口异常：', error)
-  }
+  // 跳转对应页面（无权限拦截）
+  const homePath = selectedRole.value === 'admin' ? '/admin/user-management' : '/checkin'
+  router.replace(homePath)
+  ElMessage.success(`${selectedRole.value === 'admin' ? '管理员' : '普通用户'}登录成功`)
 }
 
-// 重置密码逻辑（对接后端接口）
-const handleResetPassword = async () => {
-  // 前端校验
+// 重置密码逻辑（本地模拟）
+const handleResetPassword = () => {
   if (!forgotData.value.username.trim()) {
     ElMessage.warning('请输入用户名')
     return
@@ -166,27 +119,9 @@ const handleResetPassword = async () => {
     return
   }
 
-  try {
-    // 调用后端重置密码接口
-    const res = await apiResetPassword({
-      username: forgotData.value.username.trim(),
-      newPassword: forgotData.value.newPassword,
-    })
-
-    // 适配重置密码接口返回
-    const responseData = res.data || res
-    if (responseData.success && responseData.code === 200) {
-      ElMessage.success('密码重置成功，请使用新密码登录')
-      showForgotModal.value = false
-      forgotData.value = { username: '', newPassword: '' }
-    } else {
-      ElMessage.error(responseData.msg || '密码重置失败')
-    }
-  } catch (error) {
-    const errorMsg = error?.response?.data?.msg || error.msg || '密码重置失败，用户名不存在'
-    ElMessage.error(errorMsg)
-    console.error('重置密码接口异常：', error)
-  }
+  ElMessage.success('密码重置成功（本地模拟），请使用新密码登录')
+  showForgotModal.value = false
+  forgotData.value = { username: '', newPassword: '' }
 }
 </script>
 

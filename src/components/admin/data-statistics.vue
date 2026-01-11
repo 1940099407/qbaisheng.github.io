@@ -337,6 +337,12 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+h2 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-weight: 600;
+}
+
 .header-controls {
   display: flex;
   align-items: center;

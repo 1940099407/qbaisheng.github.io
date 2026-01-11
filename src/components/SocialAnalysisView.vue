@@ -1097,7 +1097,7 @@ const completeExchange = (reward) => {
 .page-header h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1d2129;
+  color: #1890ff;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1106,8 +1106,11 @@ const completeExchange = (reward) => {
 }
 
 .page-header h2::before {
-  content: '👥';
-  font-size: 28px;
+  /* content: '👥';
+  font-size: 28px; */
+  margin: 0;
+  color: #1890ff;
+  font-size: 24px;
 }
 
 /* 添加好友按钮 */

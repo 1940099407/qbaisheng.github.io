@@ -2,6 +2,7 @@
   <div class="page-container">
     <div class="user-settings">
       <div class="container">
+        <h2>个人中心</h2>
         <!-- 编辑资料模块 -->
         <section class="setting-module">
           <div class="module-header">
@@ -554,6 +555,13 @@ watch(
 .page-container {
   min-height: 100vh;
   background-color: #f9fafb;
+}
+
+h2 {
+  font-weight: bold;
+  margin: 0;
+  color: #1890ff;
+  font-size: 24px;
 }
 
 .user-settings {

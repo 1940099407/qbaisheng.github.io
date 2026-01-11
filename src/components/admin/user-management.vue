@@ -674,19 +674,25 @@ onMounted(() => {
   gap: 15px;
 }
 
+h2 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-weight: 600;
+}
+
 .page-header h2 {
   margin: 0;
-  font-size: 20px;
+  /* font-size: 20px; */
   color: #1d2129;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.page-header h2::before {
+/* .page-header h2::before {
   content: '👥';
   font-size: 24px;
-}
+} */
 
 .header-actions {
   display: flex;

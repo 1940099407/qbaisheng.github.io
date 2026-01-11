@@ -368,10 +368,13 @@ const viewDetail = (activity) => {
 }
 
 .page-header h2 {
-  font-size: 20px;
+  /* font-size: 20px;
   color: #333;
   font-weight: 600;
+  margin: 0; */
   margin: 0;
+  color: #1890ff;
+  font-size: 24px;
 }
 
 /* 筛选排序栏优化 */

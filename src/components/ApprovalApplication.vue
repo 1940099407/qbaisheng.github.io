@@ -155,6 +155,12 @@ h3 {
   color: #333;
 }
 
+h2 {
+  margin: 0;
+  color: #1890ff;
+  font-size: 24px;
+}
+
 .approval-form {
   margin-top: 15px;
 }

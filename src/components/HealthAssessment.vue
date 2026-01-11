@@ -1090,10 +1090,14 @@ const isNaN = (val) => Number.isNaN(val)
   }
 }
 .custom-page-header {
-  font-size: 18px; /* 保持原标题大小 */
-  color: #333; /* 标题颜色 */
-  margin-bottom: 20px; /* 与下方内容保持间距 */
-  padding: 10px 0; /* 上下内边距 */
-  font-weight: 500; /* 字体加粗 */
+  /* font-size: 18px;
+  color: #333;
+  margin-bottom: 20px;
+  padding: 10px 0;
+  font-weight: 500; */
+  font-weight: bold;
+  margin: 0;
+  color: #1890ff;
+  font-size: 24px;
 }
 </style>
